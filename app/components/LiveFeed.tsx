@@ -230,15 +230,15 @@ export default function LiveFeed({ provider, escrowAddress, reputationAddress, o
   const getEventIcon = (type: string) => {
     switch (type) {
       case "posted":
-        return "📝";
+        return "[POST]";
       case "accepted":
-        return "🤝";
+        return "[ACCEPT]";
       case "completed":
-        return "✅";
+        return "[DONE]";
       case "paid":
-        return "💰";
+        return "[PAID]";
       case "attested":
-        return "⭐";
+        return "[RATE]";
       default:
         return "•";
     }
@@ -359,12 +359,11 @@ export default function LiveFeed({ provider, escrowAddress, reputationAddress, o
           </div>
         ) : (
           events.map((event) => (
-            <div
-              key={event.id}
+            <div key={event.id}
               className="bg-slate-900/50 rounded-lg p-4 border border-slate-700 hover:border-slate-600 transition-colors"
             >
               <div className="flex items-start gap-3">
-                <div className="text-2xl">{getEventIcon(event.type)}</div>
+                <div className="text-xs font-mono text-slate-500">{getEventIcon(event.type)}</div>
                 <div className="flex-1 min-w-0">
                   <div className={`text-sm ${getEventColor(event.type)}`}>{renderEventMessage(event)}</div>
                   <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">

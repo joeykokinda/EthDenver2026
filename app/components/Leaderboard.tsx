@@ -73,16 +73,7 @@ export default function Leaderboard({ provider, reputationAddress, onAgentClick 
   const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 
   const getRankEmoji = (index: number) => {
-    switch (index) {
-      case 0:
-        return "🥇";
-      case 1:
-        return "🥈";
-      case 2:
-        return "🥉";
-      default:
-        return `#${index + 1}`;
-    }
+    return `#${index + 1}`;
   };
 
   if (loading) {
@@ -124,7 +115,7 @@ export default function Leaderboard({ provider, reputationAddress, onAgentClick 
                   </div>
                   <div className="flex items-center gap-3 mt-1">
                     <div className="text-xs text-slate-400">
-                      ⭐ {score.avgRating.toFixed(1)}/10.0
+                      Rating: {score.avgRating.toFixed(1)}/10.0
                     </div>
                     <div className="text-xs text-slate-500">
                       {score.jobCount} {score.jobCount === 1 ? "job" : "jobs"}

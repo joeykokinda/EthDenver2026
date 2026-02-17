@@ -106,7 +106,7 @@ class Agent {
       this.jobsPosted++;
       
       const jobId = Number(await this.escrow.nextJobId()) - 1;
-      console.log(`🤖 Agent #${this.id} posted job #${jobId}: "${template.slice(0, 40)}..." (${ethers.formatEther(reward)} ETH)`);
+      console.log(`[Agent ${this.id}] Posted job ${jobId}: "${template.slice(0, 40)}..." (${ethers.formatEther(reward)} ETH)`);
       return jobId;
     } catch (err) {
       console.error(`Agent #${this.id} failed to post:`, err.message);
@@ -145,7 +145,7 @@ class Agent {
     try {
       const tx = await this.escrow.acceptJob(best.jobId);
       await tx.wait();
-      console.log(`   ✅ Agent #${this.id} accepted job #${best.jobId} (ranking: ${best.ranking.toFixed(3)})`);
+      console.log(`   [Agent ${this.id}] Accepted job ${best.jobId} (ranking: ${best.ranking.toFixed(3)})`);
       return best.jobId;
     } catch (err) {
       // Job might have been accepted by another agent
@@ -158,7 +158,7 @@ class Agent {
     try {
       const tx = await this.escrow.completeJob(jobId, resultHash);
       await tx.wait();
-      console.log(`   📦 Agent #${this.id} completed job #${jobId}`);
+      console.log(`   [Agent ${this.id}] Completed job ${jobId}`);
       return true;
     } catch (err) {
       return false;
@@ -177,7 +177,7 @@ class Agent {
       const attestTx = await this.reputation.attest(jobId, workerAddress, rating, attestHash);
       await attestTx.wait();
       
-      console.log(`   💰 Agent #${this.id} paid & rated ${rating}/10 for job #${jobId}`);
+      console.log(`   [Agent ${this.id}] Paid & rated ${rating}/10 for job ${jobId}`);
       return true;
     } catch (err) {
       console.error(`Agent #${this.id} failed to pay/attest job #${jobId}:`, err.message);
@@ -197,9 +197,9 @@ async function main() {
   }
 
   const provider = new ethers.JsonRpcProvider(RPC_URL);
-  console.log(`\n🌐 Network: ${NETWORK} (${RPC_URL})`);
-  console.log(`📋 Escrow: ${ESCROW_ADDRESS}`);
-  console.log(`⭐ Reputation: ${REPUTATION_ADDRESS}\n`);
+  console.log(`\nNetwork: ${NETWORK} (${RPC_URL})`);
+  console.log(`Escrow: ${ESCROW_ADDRESS}`);
+  console.log(`Reputation: ${REPUTATION_ADDRESS}\n`);
 
   // Create 12 agents
   const escrow = new ethers.Contract(ESCROW_ADDRESS, escrowABI, provider);
@@ -211,14 +211,14 @@ async function main() {
     agents.push(new Agent(wallet, escrow, reputation, i));
   }
 
-  console.log(`👥 Initialized ${agents.length} autonomous agents\n`);
-  agents.forEach((a) => console.log(`   Agent #${a.id}: ${a.address} (${a.postProbability * 100}% post, ${(1 - a.postProbability) * 100}% work)`));
+  console.log(`Initialized ${agents.length} autonomous agents\n`);
+  agents.forEach((a) => console.log(`   Agent ${a.id}: ${a.address} (${a.postProbability * 100}% post, ${(1 - a.postProbability) * 100}% work)`));
   console.log("");
 
   const NUM_ROUNDS = parseInt(process.env.NUM_ROUNDS || "15", 10);
   const DELAY_MS = parseInt(process.env.DELAY_MS || "2000", 10);
 
-  console.log(`🎯 Running ${NUM_ROUNDS} rounds of autonomous behavior\n`);
+  console.log(`Running ${NUM_ROUNDS} rounds of autonomous behavior\n`);
 
   // Track jobs by state
   const jobStates = new Map(); // jobId -> { requester, agent, status, reward }
@@ -255,7 +255,7 @@ async function main() {
     }
 
     if (openJobs.length > 0) {
-      console.log(`\n📋 ${openJobs.length} open jobs available`);
+      console.log(`\n${openJobs.length} open jobs available`);
       
       // Shuffle agents so not always same order
       const shuffled = [...agents].sort(() => Math.random() - 0.5);
@@ -326,19 +326,19 @@ async function main() {
   }
 
   // Final stats
-  console.log("\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log("📊 FINAL AGENT SOCIETY STATS");
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+  console.log("\n\n========================================");
+  console.log("FINAL AGENT SOCIETY STATS");
+  console.log("========================================\n");
 
   for (const agent of agents) {
     const score = await agent.getMyScore();
-    console.log(`Agent #${agent.id.toString().padStart(2)}: ${agent.address}`);
+    console.log(`Agent ${agent.id.toString().padStart(2)}: ${agent.address}`);
     console.log(`  Posted: ${agent.jobsPosted} | Completed: ${agent.jobsCompleted} | Trust: ${score.avg.toFixed(1)}/10 (${score.count} ratings)`);
   }
 
   const totalPaid = Array.from(jobStates.values()).filter((s) => s.status === "Paid").length;
-  console.log(`\n✅ Total jobs completed & paid: ${totalPaid}`);
-  console.log("🎉 Autonomous agent society simulation complete!\n");
+  console.log(`\nTotal jobs completed & paid: ${totalPaid}`);
+  console.log("Autonomous agent society simulation complete!\n");
 }
 
 main().catch((e) => {
