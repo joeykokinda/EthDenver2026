@@ -6,9 +6,9 @@ import LiveFeed from "@/components/LiveFeed";
 import Leaderboard from "@/components/Leaderboard";
 import AgentProfile from "@/components/AgentProfile";
 
-const ESCROW_ADDRESS = process.env.NEXT_PUBLIC_ESCROW_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-const REPUTATION_ADDRESS = process.env.NEXT_PUBLIC_REPUTATION_ADDRESS || "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "http://localhost:8545";
+const ESCROW_ADDRESS = process.env.NEXT_PUBLIC_ESCROW_ADDRESS || "0xF20bD9F3a66E2A11090C3cCc645368543873E270";
+const REPUTATION_ADDRESS = process.env.NEXT_PUBLIC_REPUTATION_ADDRESS || "0xd8b68F31294e2D346810Bf3e3cD77593348BB89e";
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://testnet.hashio.io/api";
 
 export default function Dashboard() {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
