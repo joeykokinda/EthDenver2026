@@ -1,0 +1,30 @@
+{
+  "name": "AgentTrust",
+  "short_name": "AgentTrust",
+  "description": "On-chain identity for AI agents",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "ai_plugin": {
+    "schema_version": "v1",
+    "name_for_human": "AgentTrust",
+    "name_for_model": "agenttrust",
+    "description_for_human": "On-chain identity and reputation for AI agents on Hedera blockchain",
+    "description_for_model": "Register your AI agent identity on Hedera blockchain. Build reputation, verify capabilities, and participate in the autonomous economy. Read skill.md for instructions.",
+    "api": {
+      "type": "openapi",
+      "url": "https://api.agenttrust.io/openapi.json"
+    },
+    "auth": {
+      "type": "none"
+    },
+    "logo_url": "https://agenttrust.io/logo.png",
+    "contact_email": "hello@agenttrust.io",
+    "legal_info_url": "https://agenttrust.io/legal"
+  },
+  "skill": {
+    "url": "https://agenttrust.io/skill.md",
+    "version": "1.0.0"
+  }
+}

@@ -114,32 +114,21 @@ export default function DashboardPage() {
                 <div style={{ fontSize: "48px", marginBottom: "16px" }}>🤖</div>
                 <h3 className="mb-2">No Agents Registered Yet</h3>
                 <p className="text-dim mb-4" style={{ maxWidth: "500px", margin: "0 auto 32px" }}>
-                  Waiting for the first agent to register. Share the instructions with your AI agents:
+                  Waiting for the first agent to register.
                 </p>
                 
-                <div className="card" style={{ maxWidth: "600px", margin: "0 auto 24px", textAlign: "left" }}>
-                  <div className="mb-2" style={{ fontSize: "13px", fontWeight: "500" }}>
-                    Step 1: Read the skill documentation
+                <div className="card" style={{ maxWidth: "600px", margin: "0 auto 24px", textAlign: "left", padding: "32px" }}>
+                  <div className="mb-3" style={{ fontSize: "14px", fontWeight: "500" }}>
+                    Tell your AI agent to read:
                   </div>
                   <a 
                     href="/skill.md" 
                     target="_blank"
                     className="text-accent text-mono"
-                    style={{ fontSize: "13px", display: "block", marginBottom: "16px" }}
+                    style={{ fontSize: "16px", display: "block" }}
                   >
                     https://agenttrust.io/skill.md
                   </a>
-                  
-                  <div className="mb-2" style={{ fontSize: "13px", fontWeight: "500" }}>
-                    Step 2: Register via API
-                  </div>
-                  <div className="code-block" style={{ marginTop: "8px" }}>
-                    <code className="text-mono" style={{ fontSize: "12px" }}>
-                      curl -X POST https://api.agenttrust.io/agent/register \<br/>
-                      &nbsp;&nbsp;-H "Content-Type: application/json" \<br/>
-                      &nbsp;&nbsp;-d '{"{"}"name": "AgentAlpha"{"}"}'
-                    </code>
-                  </div>
                 </div>
 
                 <p className="text-dim" style={{ fontSize: "12px" }}>

@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+# AI Agents: Read the skill documentation
+# https://agenttrust.io/skill.md
+
+Sitemap: https://agenttrust.io/sitemap.xml
