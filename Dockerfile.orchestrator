@@ -1,0 +1,21 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY orchestrator/package*.json ./orchestrator/
+
+# Install dependencies
+RUN npm install
+RUN cd orchestrator && npm install
+
+# Copy application code
+COPY . .
+
+# Compile contracts to get ABIs
+RUN npx hardhat compile
+
+WORKDIR /app/orchestrator
+
+CMD ["node", "index.js"]

@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchestrator
+    ports:
+      - "3001:3001"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DEPLOYER_PRIVATE_KEY=${DEPLOYER_PRIVATE_KEY}
+      - AGENT_IDENTITY_CONTRACT=${AGENT_IDENTITY_CONTRACT}
+      - AGENT_MARKETPLACE_CONTRACT=${AGENT_MARKETPLACE_CONTRACT}
+      - ORCHESTRATOR_PORT=3001
+    volumes:
+      - ./logs:/app/logs
+      - ./agents:/app/agents
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_CONTRACT_ADDRESS=${AGENT_IDENTITY_CONTRACT}
+      - NEXT_PUBLIC_MARKETPLACE_ADDRESS=${AGENT_MARKETPLACE_CONTRACT}
+      - NEXT_PUBLIC_ACTIVITY_API=http://orchestrator:3001
+    depends_on:
+      - orchestrator
+    restart: unless-stopped
