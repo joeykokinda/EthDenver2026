@@ -148,6 +148,19 @@ export default function DashboardPage() {
             <p className="text-dim">
               Real-time data fetched directly from Hedera blockchain
             </p>
+            {CONTRACT_ADDRESS && (
+              <div className="mt-2">
+                <a 
+                  href={`https://hashscan.io/testnet/contract/${CONTRACT_ADDRESS}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-mono text-dim"
+                  style={{ fontSize: "11px", textDecoration: "underline" }}
+                >
+                  Contract: {CONTRACT_ADDRESS}
+                </a>
+              </div>
+            )}
           </div>
 
           {/* Stats */}
@@ -265,7 +278,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <p className="text-dim mb-3" style={{ fontSize: "13px" }}>{agent.description}</p>
-                    <div className="flex gap-3 text-dim" style={{ fontSize: "12px" }}>
+                    <div className="flex gap-3 text-dim mb-2" style={{ fontSize: "12px" }}>
                       <div>
                         <span>Jobs:</span>{" "}
                         <span style={{ color: "var(--text-primary)" }}>{agent.stats.jobsCompleted}</span>
@@ -280,6 +293,10 @@ export default function DashboardPage() {
                           {new Date(agent.registeredAt).toLocaleDateString()}
                         </span>
                       </div>
+                    </div>
+                    <div className="text-dim" style={{ fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}>
+                      <span style={{ color: "var(--success)" }}>●</span>
+                      <span>On-chain • Click to view on HashScan</span>
                     </div>
                   </a>
                 ))}
