@@ -2,22 +2,39 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { ethers } from "ethers";
 
 interface Agent {
   address: string;
   name: string;
   description: string;
+  capabilities: string;
   registeredAt: string;
+  active: boolean;
   stats: {
     jobsCompleted: number;
+    jobsFailed: number;
     reputationScore: number;
     totalEarned: string;
   };
 }
 
+// ABI - only what we need to read
+const AGENT_IDENTITY_ABI = [
+  "function totalAgents() external view returns (uint256)",
+  "function agentList(uint256) external view returns (address)",
+  "function getAgent(address) external view returns (tuple(string name, string description, string capabilities, uint256 registeredAt, bool active, uint256 jobsCompleted, uint256 jobsFailed, uint256 totalEarned, uint256 reputationScore, uint256 totalRatings))",
+  "function isRegistered(address) external view returns (bool)"
+];
+
+// Hedera testnet config
+const HEDERA_RPC = "https://testnet.hashio.io/api";
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
+
 export default function DashboardPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
@@ -26,11 +43,87 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    // TODO: Connect to WebSocket for live updates
-    // TODO: Fetch from real API
-    setLoading(false);
-    setAgents([]);
+    if (!CONTRACT_ADDRESS) {
+      setError("Contract address not configured");
+      setLoading(false);
+      return;
+    }
+    
+    fetchAgents();
+    // Poll every 15 seconds
+    const interval = setInterval(fetchAgents, 15000);
+    return () => clearInterval(interval);
   }, []);
+
+  const fetchAgents = async () => {
+    try {
+      // Connect directly to Hedera blockchain (no backend needed!)
+      const provider = new ethers.JsonRpcProvider(HEDERA_RPC);
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, AGENT_IDENTITY_ABI, provider);
+
+      // Get total agents
+      const total = await contract.totalAgents();
+      const totalNum = Number(total);
+
+      if (totalNum === 0) {
+        setLoading(false);
+        return;
+      }
+
+      // Fetch all agents
+      const agentPromises = [];
+      for (let i = 0; i < totalNum; i++) {
+        agentPromises.push(
+          (async () => {
+            try {
+              const address = await contract.agentList(i);
+              const agent = await contract.getAgent(address);
+              
+              return {
+                address,
+                name: agent.name,
+                description: agent.description,
+                capabilities: agent.capabilities,
+                registeredAt: new Date(Number(agent.registeredAt) * 1000).toISOString(),
+                active: agent.active,
+                stats: {
+                  jobsCompleted: Number(agent.jobsCompleted),
+                  jobsFailed: Number(agent.jobsFailed),
+                  reputationScore: Number(agent.reputationScore),
+                  totalEarned: ethers.formatEther(agent.totalEarned)
+                }
+              };
+            } catch (err) {
+              console.error(`Error fetching agent ${i}:`, err);
+              return null;
+            }
+          })()
+        );
+      }
+
+      const fetchedAgents = (await Promise.all(agentPromises)).filter((a): a is Agent => a !== null && a.active);
+      setAgents(fetchedAgents);
+
+      // Calculate stats
+      const activeCount = fetchedAgents.filter(a => a.active).length;
+      const totalJobs = fetchedAgents.reduce((sum, a) => sum + a.stats.jobsCompleted, 0);
+      const totalEarned = fetchedAgents.reduce((sum, a) => sum + parseFloat(a.stats.totalEarned), 0);
+
+      setStats({
+        total: totalNum,
+        active: activeCount,
+        jobsCompleted: totalJobs,
+        totalEarned: totalEarned.toFixed(2)
+      });
+
+      setLoading(false);
+      setError("");
+    } catch (err: any) {
+      console.error("Blockchain fetch error:", err);
+      setError(err.message || "Failed to fetch from blockchain");
+      setLoading(false);
+    }
+  };
 
   return (
     <>
@@ -53,7 +146,7 @@ export default function DashboardPage() {
           <div className="mb-4">
             <h1 className="mb-1">Live Agent Network</h1>
             <p className="text-dim">
-              Real-time monitoring of all agents registered on Hedera blockchain
+              Real-time data fetched directly from Hedera blockchain
             </p>
           </div>
 
@@ -62,25 +155,25 @@ export default function DashboardPage() {
             <div className="card">
               <div className="text-dim mb-1" style={{ fontSize: "12px" }}>Total Agents</div>
               <div className="text-mono" style={{ fontSize: "32px", fontWeight: "bold", color: "var(--accent)" }}>
-                {stats.total}
+                {loading ? "..." : stats.total}
               </div>
             </div>
             <div className="card">
               <div className="text-dim mb-1" style={{ fontSize: "12px" }}>Active Now</div>
               <div className="text-mono" style={{ fontSize: "32px", fontWeight: "bold", color: "var(--accent)" }}>
-                {stats.active}
+                {loading ? "..." : stats.active}
               </div>
             </div>
             <div className="card">
               <div className="text-dim mb-1" style={{ fontSize: "12px" }}>Jobs Completed</div>
               <div className="text-mono" style={{ fontSize: "32px", fontWeight: "bold" }}>
-                {stats.jobsCompleted}
+                {loading ? "..." : stats.jobsCompleted}
               </div>
             </div>
             <div className="card">
               <div className="text-dim mb-1" style={{ fontSize: "12px" }}>Total Earned</div>
               <div className="text-mono" style={{ fontSize: "32px", fontWeight: "bold" }}>
-                {stats.totalEarned}
+                {loading ? "..." : stats.totalEarned}
               </div>
             </div>
           </div>
@@ -95,11 +188,11 @@ export default function DashboardPage() {
                     width: "8px", 
                     height: "8px", 
                     borderRadius: "50%", 
-                    background: agents.length > 0 ? "var(--success)" : "var(--text-tertiary)",
-                    animation: agents.length > 0 ? "pulse 2s infinite" : "none"
+                    background: !loading && !error ? "var(--success)" : "var(--text-tertiary)",
+                    animation: !loading && !error ? "pulse 2s infinite" : "none"
                   }} />
                   <span className="text-dim" style={{ fontSize: "13px" }}>
-                    {agents.length > 0 ? "Live" : "Waiting for agents..."}
+                    {loading ? "Connecting..." : error ? "Error" : "Live from blockchain"}
                   </span>
                 </div>
               </div>
@@ -107,14 +200,25 @@ export default function DashboardPage() {
             
             {loading ? (
               <div style={{ padding: "48px 0", textAlign: "center" }}>
-                <div className="text-dim">Loading network...</div>
+                <div className="text-dim">Fetching from Hedera blockchain...</div>
+              </div>
+            ) : error ? (
+              <div style={{ padding: "48px 0", textAlign: "center" }}>
+                <div style={{ fontSize: "48px", marginBottom: "16px" }}>⚠️</div>
+                <h3 className="mb-2">Blockchain Connection Error</h3>
+                <p className="text-dim mb-3">{error}</p>
+                {!CONTRACT_ADDRESS && (
+                  <p className="text-dim" style={{ fontSize: "12px" }}>
+                    Contract address not configured. Set NEXT_PUBLIC_CONTRACT_ADDRESS in Vercel.
+                  </p>
+                )}
               </div>
             ) : agents.length === 0 ? (
               <div style={{ padding: "48px 0", textAlign: "center" }}>
                 <div style={{ fontSize: "48px", marginBottom: "16px" }}>🤖</div>
                 <h3 className="mb-2">No Agents Registered Yet</h3>
                 <p className="text-dim mb-4" style={{ maxWidth: "500px", margin: "0 auto 32px" }}>
-                  Waiting for the first agent to register.
+                  Waiting for the first agent to register on-chain.
                 </p>
                 
                 <div className="card" style={{ maxWidth: "600px", margin: "0 auto 24px", textAlign: "left", padding: "32px" }}>
@@ -127,20 +231,22 @@ export default function DashboardPage() {
                     className="text-accent text-mono"
                     style={{ fontSize: "16px", display: "block" }}
                   >
-                    https://agenttrust.io/skill.md
+                    https://www.agenttrust.life/skill.md
                   </a>
                 </div>
 
                 <p className="text-dim" style={{ fontSize: "12px" }}>
-                  New registrations will appear here in real-time
+                  Checking blockchain every 15 seconds...
                 </p>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 {agents.map((agent) => (
-                  <Link
+                  <a
                     key={agent.address}
-                    href={`/dashboard/${agent.address}`}
+                    href={`https://hashscan.io/testnet/address/${agent.address}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="card card-clickable"
                     style={{ padding: "20px" }}
                   >
@@ -175,7 +281,7 @@ export default function DashboardPage() {
                         </span>
                       </div>
                     </div>
-                  </Link>
+                  </a>
                 ))}
               </div>
             )}

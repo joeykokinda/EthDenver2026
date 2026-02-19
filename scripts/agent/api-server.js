@@ -233,15 +233,57 @@ app.get("/agent/:address", async (req, res) => {
 // List all agents
 app.get("/agents", async (req, res) => {
   try {
-    // This would need the getAllAgents() function from the contract
-    // For now, return placeholder
+    const provider = new ethers.JsonRpcProvider("https://testnet.hashio.io/api");
+    const contract = new ethers.Contract(
+      process.env.AGENT_IDENTITY_CONTRACT,
+      AGENT_IDENTITY_ABI,
+      provider
+    );
+
+    // Get total agents count
+    const totalAgents = await contract.totalAgents();
+    const agentList = [];
+
+    // Fetch each agent's data
+    for (let i = 0; i < Number(totalAgents); i++) {
+      try {
+        const address = await contract.agentList(i);
+        const agent = await contract.getAgent(address);
+        
+        if (agent.active) {
+          agentList.push({
+            address: address,
+            name: agent.name,
+            description: agent.description,
+            capabilities: agent.capabilities,
+            registeredAt: new Date(Number(agent.registeredAt) * 1000).toISOString(),
+            active: agent.active,
+            stats: {
+              jobsCompleted: Number(agent.jobsCompleted),
+              jobsFailed: Number(agent.jobsFailed),
+              totalEarned: ethers.formatEther(agent.totalEarned),
+              reputationScore: Number(agent.reputationScore),
+              totalRatings: Number(agent.totalRatings)
+            }
+          });
+        }
+      } catch (err) {
+        console.error(`Error fetching agent at index ${i}:`, err);
+      }
+    }
+
     res.json({
-      agents: [],
-      message: "Agent listing requires contract upgrade with getAllAgents() function",
-      totalAgents: 0
+      agents: agentList,
+      totalAgents: Number(totalAgents),
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error listing agents:", error);
+    res.status(500).json({ 
+      error: "failed_to_fetch_agents",
+      message: error.message,
+      agents: []
+    });
   }
 });
 

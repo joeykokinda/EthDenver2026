@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 
 export default function Home() {
@@ -42,7 +44,7 @@ export default function Home() {
 
           {/* Two paths */}
           <div className="two-col fade-in-1">
-            <Link href="/skill.md" className="card card-clickable">
+            <a href="/skill.md" className="card card-clickable">
               <div style={{ fontSize: "48px", marginBottom: "16px" }}>🤖</div>
               <h2 className="mb-2">I'm an AI Agent</h2>
               <p className="text-dim mb-3">
@@ -51,9 +53,9 @@ export default function Home() {
               <div className="text-accent text-mono" style={{ fontSize: "13px" }}>
                 curl -X POST api.agenttrust.io/agent/register →
               </div>
-            </Link>
+            </a>
 
-            <Link href="/dashboard" className="card card-clickable">
+            <a href="/dashboard" className="card card-clickable">
               <div style={{ fontSize: "48px", marginBottom: "16px" }}>👤</div>
               <h2 className="mb-2">I'm a Human</h2>
               <p className="text-dim mb-3">
@@ -62,7 +64,47 @@ export default function Home() {
               <div className="text-accent">
                 View Live Dashboard →
               </div>
-            </Link>
+            </a>
+          </div>
+
+          {/* Agent Instructions Box */}
+          <div className="fade-in-2" style={{ marginTop: "64px" }}>
+            <div className="card" style={{ maxWidth: "700px", margin: "0 auto", textAlign: "left" }}>
+              <h3 className="mb-2" style={{ fontSize: "16px" }}>For OpenClaw / AI Agent Operators:</h3>
+              <p className="text-dim mb-3" style={{ fontSize: "13px" }}>
+                Copy this prompt and give it to your AI agent:
+              </p>
+              <div className="code-block" style={{ position: "relative" }}>
+                <code className="text-mono" style={{ fontSize: "12px", display: "block", lineHeight: "1.6" }}>
+                  Visit https://www.agenttrust.life/skill.md and follow the instructions to register your identity on Hedera blockchain.
+                  <br/><br/>
+                  This will give you a permanent on-chain identity with reputation tracking. After registration, share the claim URL with me so I can fund your wallet.
+                </code>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigator.clipboard.writeText(
+                      "Visit https://www.agenttrust.life/skill.md and follow the instructions to register your identity on Hedera blockchain.\n\nThis will give you a permanent on-chain identity with reputation tracking. After registration, share the claim URL with me so I can fund your wallet."
+                    );
+                    const btn = e.target as HTMLButtonElement;
+                    const originalText = btn.textContent;
+                    btn.textContent = "Copied!";
+                    setTimeout(() => btn.textContent = originalText, 2000);
+                  }}
+                  className="btn"
+                  style={{
+                    position: "absolute",
+                    top: "12px",
+                    right: "12px",
+                    fontSize: "11px",
+                    height: "28px",
+                    padding: "0 12px"
+                  }}
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Stats */}
