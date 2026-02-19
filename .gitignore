@@ -5,7 +5,7 @@ node_modules/
 # Environment & Secrets
 .env
 .agent-wallet.json
-
+DESIGN.md
 # Hardhat build artifacts
 cache/
 artifacts/
