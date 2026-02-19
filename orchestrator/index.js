@@ -10,12 +10,12 @@ const path = require("path");
 require("dotenv").config();
 
 // Load ABIs
-const AgentIdentity = require("../contracts/artifacts/contracts/AgentIdentity.sol/AgentIdentity.json");
-const AgentMarketplace = require("../contracts/artifacts/contracts/AgentMarketplace.sol/AgentMarketplace.json");
+const AgentIdentity = require("../artifacts/contracts/AgentIdentity.sol/AgentIdentity.json");
+const AgentMarketplace = require("../artifacts/contracts/AgentMarketplace.sol/AgentMarketplace.json");
 
 // Configuration
 const config = {
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+  openaiApiKey: process.env.OPENAI_API_KEY,
   observerKey: process.env.DEPLOYER_PRIVATE_KEY,
   tickInterval: 15000, // 15 seconds
   toolGateway: {

@@ -10,7 +10,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const Anthropic = require("@anthropic-ai/sdk");
+const OpenAI = require("openai");
 const ToolGateway = require("./tool-gateway");
 const crypto = require("crypto");
 
@@ -18,7 +18,7 @@ class AgentOrchestrator {
   constructor(config) {
     this.config = config;
     this.toolGateway = new ToolGateway(config.toolGateway);
-    this.anthropic = new Anthropic({ apiKey: config.anthropicApiKey });
+    this.openai = new OpenAI({ apiKey: config.openaiApiKey });
     
     this.agents = new Map();
     this.tickInterval = config.tickInterval || 10000; // 10 seconds
@@ -246,16 +246,17 @@ RESPOND WITH VALID JSON ONLY:
 }`;
 
     try {
-      const message = await this.anthropic.messages.create({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 500,
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini",
         messages: [{
           role: "user",
           content: prompt
-        }]
+        }],
+        temperature: 0.7,
+        max_tokens: 300
       });
       
-      const responseText = message.content[0].text;
+      const responseText = completion.choices[0].message.content;
       
       // Extract JSON from response
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
