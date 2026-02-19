@@ -26,9 +26,29 @@ export default function LiveDashboard() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
+
+  // Simple password check
+  const checkPassword = () => {
+    // Dev password - change this!
+    if (password === "ethdenver2026") {
+      setIsAuthenticated(true);
+      localStorage.setItem("auth", "true");
+    } else {
+      alert("Wrong password!");
+    }
+  };
 
   useEffect(() => {
-    // Fetch activity feed every 5 seconds
+    // Check if already authenticated
+    if (localStorage.getItem("auth") === "true") {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  useEffect(() => {
     const fetchActivity = async () => {
       try {
         const res = await fetch(`${ACTIVITY_API}/api/activity`);
@@ -61,6 +81,11 @@ export default function LiveDashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  const openPersonalityFile = (agentName: string) => {
+    const url = `https://github.com/joeykokinda/EthDenver2026/blob/main/agents/personalities/${agentName}.md`;
+    window.open(url, '_blank');
+  };
+
   return (
     <>
       <header className="header">
@@ -84,9 +109,22 @@ export default function LiveDashboard() {
       <main style={{ minHeight: "calc(100vh - 60px)", padding: "64px 0" }}>
         <div className="container">
           <div className="mb-4">
-            <h1 className="mb-1">Live Agent Activity</h1>
+            <div className="flex items-center gap-3 mb-2">
+              <h1>Live Agent Activity</h1>
+              <span style={{
+                padding: "4px 12px",
+                background: "var(--accent)",
+                color: "black",
+                fontSize: "11px",
+                fontWeight: "600",
+                borderRadius: "4px",
+                textTransform: "uppercase"
+              }}>
+                Controlled Simulation
+              </span>
+            </div>
             <p className="text-dim">
-              Real-time reasoning and actions from autonomous agents
+              Real-time reasoning and actions from autonomous AI agents. This is a controlled test environment demonstrating reputation dynamics.
             </p>
           </div>
 
@@ -112,7 +150,7 @@ export default function LiveDashboard() {
                 </div>
               ) : activities.length === 0 ? (
                 <div style={{ padding: "48px 0", textAlign: "center" }}>
-                  <div className="text-dim">No activity yet. Start the orchestrator to see agents in action.</div>
+                  <div className="text-dim">No activity yet. Agents are monitoring for jobs.</div>
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxHeight: "600px", overflowY: "auto" }}>
@@ -175,7 +213,27 @@ export default function LiveDashboard() {
             {/* Agent Control Panel */}
             <div>
               <div className="card mb-3">
-                <h3 className="mb-3">Active Agents</h3>
+                <div className="flex justify-between items-center mb-3">
+                  <h3>Active Agents</h3>
+                  {!isAuthenticated && (
+                    <button 
+                      onClick={() => {
+                        const pw = prompt("Enter password to edit agents:");
+                        if (pw) {
+                          setPassword(pw);
+                          checkPassword();
+                        }
+                      }}
+                      className="btn"
+                      style={{ fontSize: "11px", padding: "4px 12px" }}
+                    >
+                      🔒 Unlock
+                    </button>
+                  )}
+                  {isAuthenticated && (
+                    <span style={{ fontSize: "11px", color: "var(--success)" }}>✓ Unlocked</span>
+                  )}
+                </div>
                 {agents.map((agent) => (
                   <div 
                     key={agent.address}
@@ -201,32 +259,62 @@ export default function LiveDashboard() {
                         {agent.mode.toUpperCase()}
                       </span>
                     </div>
-                    <code className="text-dim" style={{ fontSize: "10px" }}>
+                    <code className="text-dim" style={{ fontSize: "10px", display: "block", marginBottom: "8px" }}>
                       {agent.address.slice(0, 6)}...{agent.address.slice(-4)}
                     </code>
+                    <button
+                      onClick={() => openPersonalityFile(agent.name)}
+                      className="btn"
+                      style={{ 
+                        width: "100%", 
+                        fontSize: "11px", 
+                        padding: "6px",
+                        background: "var(--bg-tertiary)"
+                      }}
+                    >
+                      View Personality File →
+                    </button>
                   </div>
                 ))}
               </div>
 
               <div className="card">
-                <h3 className="mb-2">Instructions</h3>
+                <h3 className="mb-2">Experiment Controls</h3>
                 <div className="text-dim" style={{ fontSize: "13px", lineHeight: "1.6" }}>
-                  <p className="mb-2">
-                    To modify agent behavior, edit personality MD files in:
-                  </p>
-                  <code style={{ 
-                    display: "block",
-                    padding: "8px",
-                    background: "var(--bg-tertiary)",
-                    borderRadius: "4px",
-                    fontSize: "11px",
-                    marginBottom: "12px"
-                  }}>
-                    agents/personalities/*.md
-                  </code>
-                  <p>
-                    Uncomment different modes (SCAMMER, GREEDY, etc.) and watch behavior change in real-time.
-                  </p>
+                  {isAuthenticated ? (
+                    <>
+                      <p className="mb-2" style={{ color: "var(--success)" }}>
+                        ✓ You can edit agent personality files in:
+                      </p>
+                      <code style={{ 
+                        display: "block",
+                        padding: "8px",
+                        background: "var(--bg-tertiary)",
+                        borderRadius: "4px",
+                        fontSize: "11px",
+                        marginBottom: "12px"
+                      }}>
+                        agents/personalities/*.md
+                      </code>
+                      <p style={{ fontSize: "12px" }}>
+                        Uncomment different modes (SCAMMER, GREEDY, etc.) and watch behavior change in real-time.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mb-2">
+                        🔒 This is a controlled experiment demonstrating:
+                      </p>
+                      <ul style={{ fontSize: "12px", paddingLeft: "20px", marginTop: "8px" }}>
+                        <li>Good agents build reputation</li>
+                        <li>Scammers get excluded</li>
+                        <li>All verifiable on-chain</li>
+                      </ul>
+                      <p style={{ fontSize: "11px", marginTop: "12px", fontStyle: "italic" }}>
+                        Password required to modify agent behavior
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
