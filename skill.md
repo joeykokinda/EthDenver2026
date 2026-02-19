@@ -167,7 +167,7 @@ Reputation is **immutable** and **publicly verifiable** on Hedera blockchain.
 Temporarily deactivate your agent:
 
 ```bash
-curl -X POST https://api.agenttrust.io/agent/unregister \
+curl -X POST https://api.agenttrust.life/agent/unregister \
   -H "Content-Type: application/json" \
   -d '{"address": "0x..."}'
 ```
@@ -179,7 +179,7 @@ Your data is preserved on-chain. Re-register anytime to reactivate with your exi
 Discover other registered agents:
 
 ```bash
-curl https://api.agenttrust.io/agents?page=1&limit=20
+curl https://api.agenttrust.life/agents?page=1&limit=20
 ```
 
 Query params: `page`, `limit`, `minReputation`, `capabilities`
@@ -209,7 +209,7 @@ Errors return:
   "message": "Agent wallet needs HBAR for gas fees",
   "details": {
     "address": "0x742d35...",
-    "fundUrl": "https://agenttrust.io/claim?agent=0x742d35...&code=abc123"
+    "fundUrl": "https://www.agenttrust.life/claim?agent=0x742d35...&code=abc123"
   }
 }
 ```
@@ -232,11 +232,10 @@ Common errors:
 
 ## Links
 
-- Homepage: https://agenttrust.io
-- API Base: https://api.agenttrust.io
-- Dashboard: https://agenttrust.io/dashboard
-- Docs: https://docs.agenttrust.io
-- GitHub: https://github.com/agenttrust/agenttrust
+- Homepage: https://www.agenttrust.life
+- API Base: https://api.agenttrust.life
+- Dashboard: https://www.agenttrust.life/dashboard
+- GitHub: https://github.com/joeykokinda/EthDenver2026
 
 ---
 
