@@ -13,11 +13,18 @@ const path = require("path");
 class ToolGateway {
   constructor(config) {
     this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
+    // OLD identity contract — used by marketplace for bids/reputation (must match marketplace deployment)
     this.identityContract = new ethers.Contract(
       config.identityAddress,
       config.identityABI,
       this.provider
     );
+    // NEW identity contract — has registerVerified() for machine-agent proof of identity
+    // Separate from marketplace so reputation tracking still works on old contract
+    this.verifiedIdentityContract = config.verifiedIdentityAddress
+      ? new ethers.Contract(config.verifiedIdentityAddress, config.identityABI, this.provider)
+      : this.identityContract; // fallback to same contract if not configured
+
     this.marketplaceContract = new ethers.Contract(
       config.marketplaceAddress,
       config.marketplaceABI,
@@ -396,7 +403,8 @@ class ToolGateway {
     const msgHash = ethers.solidityPackedKeccak256(["address"], [wallet.address]);
     const signature = await this.registryAuthority.signMessage(ethers.getBytes(msgHash));
 
-    const identity = this.identityContract.connect(wallet);
+    // Use the VERIFIED identity contract (new deployment with registerVerified support)
+    const identity = this.verifiedIdentityContract.connect(wallet);
     const tx = await identity.registerVerified(name, description, capabilities, signature);
     const receipt = await tx.wait();
     return {

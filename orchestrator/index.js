@@ -22,7 +22,8 @@ const config = {
   tickInterval: 8000, // 8 seconds for faster demo
   toolGateway: {
     rpcUrl: "https://testnet.hashio.io/api",
-    identityAddress: process.env.AGENT_IDENTITY_CONTRACT,
+    identityAddress: process.env.AGENT_IDENTITY_CONTRACT,          // OLD — marketplace-compatible
+    verifiedIdentityAddress: process.env.AGENT_VERIFIED_IDENTITY_CONTRACT, // NEW — registerVerified()
     marketplaceAddress: process.env.AGENT_MARKETPLACE_CONTRACT,
     identityABI: AgentIdentity.abi,
     marketplaceABI: AgentMarketplace.abi,
