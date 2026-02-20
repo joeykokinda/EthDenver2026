@@ -20,6 +20,13 @@ interface AgentInfo {
   mode: string;
 }
 
+interface SimStatus {
+  running: boolean;
+  uptime?: string;
+  lastTick?: string;
+  agents?: number;
+}
+
 const ACTIVITY_API = process.env.NEXT_PUBLIC_ACTIVITY_API || "http://localhost:3001";
 
 export default function LiveDashboard() {
@@ -29,11 +36,78 @@ export default function LiveDashboard() {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
+  const [simStatus, setSimStatus] = useState<SimStatus>({ running: false });
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Filter activities by selected agent
   const filteredActivities = selectedAgent
     ? activities.filter((a) => a.agent === selectedAgent)
     : activities;
+
+  // Check sim status
+  const checkSimStatus = async () => {
+    try {
+      const res = await fetch(`${ACTIVITY_API}/api/status`);
+      const data = await res.json();
+      setSimStatus(data);
+    } catch (error) {
+      console.error("Failed to check sim status:", error);
+    }
+  };
+
+  // Start simulation
+  const startSim = async () => {
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${ACTIVITY_API}/api/control/start`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        alert("✅ Simulation started!");
+        await checkSimStatus();
+      } else {
+        alert("❌ " + data.message);
+      }
+    } catch (error) {
+      alert("❌ Failed to start simulation");
+    }
+    setActionLoading(false);
+  };
+
+  // Stop simulation
+  const stopSim = async () => {
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${ACTIVITY_API}/api/control/stop`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        alert("🛑 Simulation stopped!");
+        await checkSimStatus();
+      } else {
+        alert("❌ " + data.message);
+      }
+    } catch (error) {
+      alert("❌ Failed to stop simulation");
+    }
+    setActionLoading(false);
+  };
+
+  // Restart simulation
+  const restartSim = async () => {
+    setActionLoading(true);
+    try {
+      await fetch(`${ACTIVITY_API}/api/control/stop`, { method: "POST" });
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const res = await fetch(`${ACTIVITY_API}/api/control/start`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        alert("🔄 Simulation restarted!");
+        await checkSimStatus();
+      }
+    } catch (error) {
+      alert("❌ Failed to restart simulation");
+    }
+    setActionLoading(false);
+  };
 
   // Simple password check
   const checkPassword = () => {
@@ -77,10 +151,12 @@ export default function LiveDashboard() {
 
     fetchActivity();
     fetchAgents();
+    checkSimStatus();
     
     const interval = setInterval(() => {
       fetchActivity();
       fetchAgents();
+      checkSimStatus();
     }, 5000);
 
     return () => clearInterval(interval);
@@ -362,37 +438,155 @@ export default function LiveDashboard() {
           {/* Experiment Controls - Only show when authenticated */}
           {isAuthenticated && (
             <div className="card" style={{ marginTop: "24px" }}>
-              <h3 className="mb-2">Experiment Controls</h3>
-              <div className="text-dim" style={{ fontSize: "13px", lineHeight: "1.6" }}>
-                <p className="mb-2" style={{ color: "var(--success)" }}>
-                  ✓ You can edit agent personality files in:
+              <h3 className="mb-3">🎮 Simulation Controls</h3>
+              
+              {/* Status */}
+              <div style={{ 
+                padding: "12px", 
+                background: simStatus.running ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                border: `1px solid ${simStatus.running ? "var(--success)" : "var(--error)"}`,
+                borderRadius: "6px",
+                marginBottom: "16px"
+              }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div style={{ fontWeight: "600", marginBottom: "4px" }}>
+                      Status: {simStatus.running ? "🟢 RUNNING" : "🔴 STOPPED"}
+                    </div>
+                    {simStatus.running && (
+                      <div className="text-dim" style={{ fontSize: "12px" }}>
+                        {simStatus.agents || 0} agents active • Last tick: {simStatus.lastTick || "N/A"}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{
+                    width: "10px",
+                    height: "10px",
+                    borderRadius: "50%",
+                    background: simStatus.running ? "var(--success)" : "var(--error)",
+                    animation: simStatus.running ? "pulse 2s infinite" : "none"
+                  }} />
+                </div>
+              </div>
+
+              {/* Control Buttons */}
+              <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+                <button
+                  onClick={startSim}
+                  disabled={actionLoading || simStatus.running}
+                  className="btn"
+                  style={{
+                    flex: 1,
+                    background: simStatus.running ? "var(--bg-tertiary)" : "var(--success)",
+                    color: simStatus.running ? "var(--text-dim)" : "white",
+                    cursor: simStatus.running ? "not-allowed" : "pointer",
+                    opacity: simStatus.running ? 0.5 : 1
+                  }}
+                >
+                  {actionLoading ? "⏳" : "▶️"} Start
+                </button>
+                
+                <button
+                  onClick={stopSim}
+                  disabled={actionLoading || !simStatus.running}
+                  className="btn"
+                  style={{
+                    flex: 1,
+                    background: !simStatus.running ? "var(--bg-tertiary)" : "var(--error)",
+                    color: !simStatus.running ? "var(--text-dim)" : "white",
+                    cursor: !simStatus.running ? "not-allowed" : "pointer",
+                    opacity: !simStatus.running ? 0.5 : 1
+                  }}
+                >
+                  {actionLoading ? "⏳" : "⏹️"} Stop
+                </button>
+                
+                <button
+                  onClick={restartSim}
+                  disabled={actionLoading}
+                  className="btn"
+                  style={{
+                    flex: 1,
+                    background: "var(--accent)",
+                    color: "black"
+                  }}
+                >
+                  {actionLoading ? "⏳" : "🔄"} Restart
+                </button>
+              </div>
+
+              {/* Agent Personality Controls */}
+              <div style={{ 
+                padding: "12px",
+                background: "var(--bg-secondary)",
+                borderRadius: "6px",
+                marginBottom: "12px"
+              }}>
+                <h4 style={{ fontSize: "13px", fontWeight: "600", marginBottom: "8px" }}>
+                  Edit Agent Personalities
+                </h4>
+                <p className="text-dim" style={{ fontSize: "12px", marginBottom: "12px" }}>
+                  Edit personality files in <code style={{ background: "var(--bg-tertiary)", padding: "2px 6px", borderRadius: "3px" }}>agents/personalities/*.md</code>
                 </p>
-                <code style={{ 
-                  display: "block",
-                  padding: "8px",
-                  background: "var(--bg-tertiary)",
-                  borderRadius: "4px",
-                  fontSize: "11px",
-                  marginBottom: "12px"
-                }}>
-                  agents/personalities/*.md
-                </code>
-                <p style={{ fontSize: "12px" }}>
-                  Edit modes, policies, and watch behavior change in real-time.
-                </p>
-                <div style={{ marginTop: "12px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
                   {agents.map((agent) => (
                     <button
                       key={agent.address}
                       onClick={() => openPersonalityFile(agent.name)}
                       className="btn"
-                      style={{ fontSize: "11px", padding: "6px 12px" }}
+                      style={{ 
+                        fontSize: "11px", 
+                        padding: "6px 12px",
+                        background: "var(--bg-tertiary)"
+                      }}
                     >
-                      Edit {agent.name} →
+                      {agent.name} →
                     </button>
                   ))}
                 </div>
               </div>
+
+              {/* Instructions */}
+              <div className="text-dim" style={{ fontSize: "12px", lineHeight: "1.6" }}>
+                <p style={{ marginBottom: "8px" }}>
+                  💡 <strong>How it works:</strong>
+                </p>
+                <ul style={{ paddingLeft: "20px", margin: "0" }}>
+                  <li>Start/Stop the simulation tick loop</li>
+                  <li>Edit agent modes (PRO, SCAMMER, etc.)</li>
+                  <li>Changes take effect immediately</li>
+                  <li>All actions are on-chain & verifiable</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* Password Prompt for Unauthenticated Users */}
+          {!isAuthenticated && (
+            <div className="card" style={{ marginTop: "24px", textAlign: "center" }}>
+              <h3 className="mb-2">🔒 Controlled Simulation</h3>
+              <p className="text-dim" style={{ fontSize: "13px", marginBottom: "16px" }}>
+                This is a controlled experiment demonstrating reputation dynamics.
+              </p>
+              <button
+                onClick={() => {
+                  const pw = prompt("Enter admin password:");
+                  if (pw === "ethdenver2026") {
+                    setIsAuthenticated(true);
+                    localStorage.setItem("auth", "true");
+                    alert("✅ Authenticated! You now have full control.");
+                  } else if (pw) {
+                    alert("❌ Wrong password!");
+                  }
+                }}
+                className="btn"
+                style={{ fontSize: "13px", padding: "8px 24px" }}
+              >
+                🔓 Unlock Control Panel
+              </button>
+              <p className="text-dim" style={{ fontSize: "11px", marginTop: "12px", fontStyle: "italic" }}>
+                Password: <code>ethdenver2026</code>
+              </p>
             </div>
           )}
         </div>

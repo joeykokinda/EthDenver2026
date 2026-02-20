@@ -71,6 +71,43 @@ app.get("/api/agents", (req, res) => {
   res.json({ agents });
 });
 
+// Get simulation status
+app.get("/api/status", (req, res) => {
+  res.json({
+    running: orchestrator.running,
+    agents: orchestrator.agents.size,
+    uptime: orchestrator.startTime 
+      ? Math.floor((Date.now() - orchestrator.startTime) / 1000) + "s"
+      : "0s",
+    lastTick: orchestrator.lastTickTime 
+      ? new Date(orchestrator.lastTickTime).toLocaleTimeString()
+      : "N/A"
+  });
+});
+
+// Control endpoints
+app.post("/api/control/start", async (req, res) => {
+  if (orchestrator.running) {
+    return res.json({ success: false, message: "Simulation already running" });
+  }
+  
+  try {
+    await orchestrator.start();
+    res.json({ success: true, message: "Simulation started" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.post("/api/control/stop", (req, res) => {
+  if (!orchestrator.running) {
+    return res.json({ success: false, message: "Simulation not running" });
+  }
+  
+  orchestrator.stop();
+  res.json({ success: true, message: "Simulation stopped" });
+});
+
 // Start server
 const PORT = process.env.ORCHESTRATOR_PORT || 3001;
 app.listen(PORT, () => {

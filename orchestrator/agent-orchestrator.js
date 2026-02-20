@@ -23,6 +23,8 @@ class AgentOrchestrator {
     this.agents = new Map();
     this.tickInterval = config.tickInterval || 10000; // 10 seconds
     this.running = false;
+    this.startTime = null;
+    this.lastTickTime = null;
     
     // Activity feed for UI
     this.activityFeed = [];
@@ -387,12 +389,14 @@ RESPOND WITH VALID JSON ONLY:
     if (this.running) return;
     
     this.running = true;
+    this.startTime = Date.now();
     console.log("\n🚀 Orchestrator started");
     console.log(`Tick interval: ${this.tickInterval}ms`);
     console.log(`Agents loaded: ${this.agents.size}`);
     
     while (this.running) {
       await this.tick();
+      this.lastTickTime = Date.now();
       await new Promise(resolve => setTimeout(resolve, this.tickInterval));
     }
   }
