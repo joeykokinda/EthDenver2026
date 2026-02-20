@@ -413,6 +413,12 @@ RESPOND WITH VALID JSON ONLY:
     console.log(`TICK at ${new Date().toISOString()}`);
     console.log("=".repeat(60));
 
+    // Safety timeout: release the tick lock after 90s no matter what
+    const tickTimeout = setTimeout(() => {
+      console.log("TICK TIMEOUT — releasing lock");
+      this.tickRunning = false;
+    }, 90000);
+
     try {
       // Get blockchain snapshot
       const snapshot = await this.getChainSnapshot();
@@ -451,6 +457,7 @@ RESPOND WITH VALID JSON ONLY:
     } catch (error) {
       console.error("Tick error:", error);
     } finally {
+      clearTimeout(tickTimeout);
       this.tickRunning = false;
     }
   }
@@ -835,8 +842,8 @@ RESPOND WITH VALID JSON ONLY (no markdown, no code blocks):
         model: "gpt-4o",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.85,
-        max_tokens: 700
-      });
+        max_tokens: 700,
+      }, { timeout: 30000 });
 
       const responseText = completion.choices[0].message.content;
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
