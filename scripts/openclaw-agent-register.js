@@ -126,7 +126,7 @@ async function main() {
       if (mirrorRes.ok) {
         const mirrorData = await mirrorRes.json();
         if (mirrorData.timestamp) {
-          hashScanTxUrl = `https://hashscan.io/testnet/transaction/${mirrorData.timestamp}`;
+          hashScanTxUrl = `https://hashscan.io/testnet/transaction/${mirrorData.timestamp}/result`;
         }
       }
     } catch {}

@@ -44,7 +44,7 @@ async function toHashScanUrl(evmHash: string): Promise<string | undefined> {
     if (!res.ok) return undefined;
     const data = await res.json();
     if (!data.timestamp) return undefined;
-    return `https://hashscan.io/testnet/transaction/${data.timestamp}`;
+    return `https://hashscan.io/testnet/transaction/${data.timestamp}/result`;
   } catch {
     return undefined;
   }

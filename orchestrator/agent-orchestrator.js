@@ -43,6 +43,9 @@ class AgentOrchestrator {
     this.jobDescriptions = new Map(); // jobId → { description, type: "poem"|"art" }
     this.lastJobType = "art"; // alternate: next will be "poem"
 
+    // Track how many ticks each job has been "waiting" without bid acceptance — force after 3
+    this.jobWaitCounts = new Map(); // jobId → wait count
+
     // Tracks in-progress operations so ALL connected clients can lock their buttons
     // null | "starting" | "stopping" | "unregistering"
     this.pendingAction = null;
@@ -466,8 +469,36 @@ RESPOND WITH VALID JSON ONLY:
         const decision = await this.decideAcceptBid(posterData.name, job, pendingBids, snapshot);
         if (decision && decision.decision === "accept") {
           const accepted = await this.executeBidAcceptance(posterAgent, job, decision.bidId, decision, pendingBids);
-          this.attemptedAcceptances.add(job.id); // Prevent retry regardless of success/failure
-          if (accepted) return; // Job now assigned, skip new bidding
+          this.attemptedAcceptances.add(job.id);
+          this.jobWaitCounts.delete(job.id);
+          if (accepted) return;
+        } else {
+          // LLM said "wait" — track and force-accept after 3 waits so jobs don't deadlock
+          const waitCount = (this.jobWaitCounts.get(job.id) || 0) + 1;
+          this.jobWaitCounts.set(job.id, waitCount);
+
+          if (waitCount >= 3) {
+            // Force-accept: prefer non-warned bidders with highest reputation
+            const nonWarned = pendingBids.filter(b => {
+              const bidder = snapshot.agents.find(a => a.address === b.bidder);
+              return !bidder?.warned && (bidder?.reportCount || 0) < 2;
+            });
+            const candidates = nonWarned.length > 0 ? nonWarned : pendingBids;
+            candidates.sort((a, b) => {
+              const repA = snapshot.agents.find(ag => ag.address === a.bidder)?.reputationScore || 500;
+              const repB = snapshot.agents.find(ag => ag.address === b.bidder)?.reputationScore || 500;
+              return repB - repA;
+            });
+            const forceBid = candidates[0];
+            if (forceBid) {
+              console.log(`Force-accepting bid ${forceBid.id} on job ${job.id} after ${waitCount} waits`);
+              await this.executeBidAcceptance(posterAgent, job, forceBid.id,
+                { message: "After reviewing all bids, I have selected you for this job." }, pendingBids);
+            }
+            this.attemptedAcceptances.add(job.id);
+            this.jobWaitCounts.delete(job.id);
+            return;
+          }
         }
       }
     }
@@ -1545,6 +1576,7 @@ RESPOND WITH VALID JSON ONLY (no markdown):
       this._tickTimer = null;
     }
     this.attemptedAcceptances.clear();
+    this.jobWaitCounts.clear();
     this.lastSnapshot = null;
     this.tickRunning = false;
     this.jobDescriptions.clear();

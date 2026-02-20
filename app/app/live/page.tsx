@@ -319,6 +319,7 @@ export default function LiveDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [activityCounts, setActivityCounts] = useState<Record<string, number>>({});
+  const [modalAgent, setModalAgent] = useState<string | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
 
   const jobs = deriveJobs(activities);
@@ -450,8 +451,18 @@ export default function LiveDashboard() {
 
             {/* ── COL 1: Agent Roster ── */}
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <div className="text-dim" style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "2px" }}>
-                Agents ({agents.length})
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2px" }}>
+                <div className="text-dim" style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Agents ({agents.length})
+                </div>
+                <div style={{ fontSize: "9px", color: "var(--text-dim)", display: "flex", alignItems: "center", gap: "4px" }}>
+                  <div style={{
+                    width: 5, height: 5, borderRadius: "50%",
+                    background: simStatus.running ? "var(--success)" : "var(--border)",
+                    animation: simStatus.running ? "pulse 2s infinite" : "none"
+                  }} />
+                  {simStatus.running ? "live from chain" : "last snapshot"}
+                </div>
               </div>
 
               <div
@@ -468,58 +479,58 @@ export default function LiveDashboard() {
                 <span style={{ float: "right", opacity: 0.7 }}>{activities.length}</span>
               </div>
 
-              {agents.map(agent => (
-                <div
-                  key={agent.address}
-                  onClick={() => setSelectedAgent(selectedAgent === agent.name ? null : agent.name)}
-                  style={{
-                    padding: "8px 10px", borderRadius: "6px", cursor: "pointer",
-                    background: selectedAgent === agent.name ? `${agentColor(agent.name)}22` : "var(--bg-secondary)",
-                    border: `1px solid ${selectedAgent === agent.name ? agentColor(agent.name) : "var(--border)"}`,
-                    transition: "all 0.15s"
-                  }}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <AgentAvatar name={agent.name} size={18} />
-                    <span style={{ fontWeight: "600", fontSize: "12px", textTransform: "capitalize" }}>{agent.name}</span>
-                    <span style={{ marginLeft: "auto", fontSize: "10px", color: "var(--text-dim)" }}>
-                      {activityCounts[agent.name] || 0}
-                    </span>
+              {agents.map(agent => {
+                const earned = parseFloat(agent.totalEarned || "0");
+                return (
+                  <div
+                    key={agent.address}
+                    onClick={() => setSelectedAgent(selectedAgent === agent.name ? null : agent.name)}
+                    style={{
+                      padding: "8px 10px", borderRadius: "6px", cursor: "pointer",
+                      background: selectedAgent === agent.name ? `${agentColor(agent.name)}22` : "var(--bg-secondary)",
+                      border: `1px solid ${selectedAgent === agent.name ? agentColor(agent.name) : "var(--border)"}`,
+                      transition: "all 0.15s"
+                    }}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <AgentAvatar name={agent.name} size={18} />
+                      <span style={{ fontWeight: "600", fontSize: "12px", textTransform: "capitalize" }}>{agent.name}</span>
+                      <button
+                        onClick={e => { e.stopPropagation(); setModalAgent(agent.name); }}
+                        style={{
+                          marginLeft: "4px", padding: "1px 5px",
+                          fontSize: "9px", fontWeight: "600", letterSpacing: "0.3px",
+                          background: `${agentColor(agent.name)}20`,
+                          border: `1px solid ${agentColor(agent.name)}44`,
+                          borderRadius: "3px", color: agentColor(agent.name),
+                          cursor: "pointer", lineHeight: "1.4"
+                        }}
+                      >
+                        MD
+                      </button>
+                      <span style={{ marginLeft: "auto", fontSize: "10px", color: "var(--text-dim)" }}>
+                        {activityCounts[agent.name] || 0}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "10px", color: "var(--text-dim)", paddingLeft: "26px" }}>
+                      {AGENT_ROLES[agent.name] || agent.mode}
+                    </div>
+                    <div style={{ fontSize: "10px", paddingLeft: "26px", marginTop: "3px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <span style={{ color: agentColor(agent.name), fontWeight: "600" }}>
+                        REP {agent.reputation ?? 0}
+                      </span>
+                      <span style={{ color: "var(--text-dim)" }}>
+                        {agent.jobsCompleted ?? 0}W {agent.jobsFailed ?? 0}F
+                      </span>
+                      {earned > 0 && (
+                        <span style={{ color: "#4ade80" }}>
+                          {earned.toFixed(2)}ℏ
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ fontSize: "10px", color: "var(--text-dim)", paddingLeft: "26px" }}>
-                    {AGENT_ROLES[agent.name] || agent.mode}
-                  </div>
-                  <div style={{ fontSize: "10px", paddingLeft: "26px", marginTop: "2px", display: "flex", gap: "8px" }}>
-                    <span style={{ color: agentColor(agent.name), fontWeight: "600" }}>
-                      REP {agent.reputation ?? 0}
-                    </span>
-                    <span style={{ color: "var(--text-dim)" }}>
-                      {agent.jobsCompleted ?? 0}W {agent.jobsFailed ?? 0}F
-                    </span>
-                  </div>
-                </div>
-              ))}
-
-              {/* Personality panel */}
-              {selectedAgent && selectedPersonality && (
-                <div style={{
-                  marginTop: "4px", padding: "12px", borderRadius: "8px",
-                  background: "var(--bg-secondary)", border: `1px solid ${agentColor(selectedAgent)}`,
-                  maxHeight: "260px", overflowY: "auto"
-                }}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <AgentAvatar name={selectedAgent} size={20} />
-                    <span style={{ fontWeight: "600", fontSize: "12px", textTransform: "capitalize" }}>{selectedAgent}</span>
-                  </div>
-                  <pre style={{
-                    fontSize: "9px", lineHeight: "1.6",
-                    color: "var(--text-dim)", whiteSpace: "pre-wrap",
-                    wordBreak: "break-word", margin: 0
-                  }}>
-                    {selectedPersonality}
-                  </pre>
-                </div>
-              )}
+                );
+              })}
 
               {/* Sim controls */}
               {isAuthenticated ? (
@@ -720,6 +731,77 @@ export default function LiveDashboard() {
           </div>
         </div>
       </main>
+
+      {/* ── Personality Modal ── */}
+      {modalAgent && (
+        <div
+          onClick={() => setModalAgent(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 1000,
+            background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "24px"
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: "640px", maxHeight: "80vh",
+              background: "var(--bg-secondary)",
+              border: `1px solid ${agentColor(modalAgent)}`,
+              borderRadius: "12px",
+              display: "flex", flexDirection: "column",
+              overflow: "hidden"
+            }}
+          >
+            {/* Modal header */}
+            <div style={{
+              padding: "16px 20px",
+              borderBottom: "1px solid var(--border)",
+              display: "flex", alignItems: "center", gap: "10px",
+              flexShrink: 0
+            }}>
+              <AgentAvatar name={modalAgent} size={28} />
+              <div>
+                <div style={{ fontWeight: "700", fontSize: "15px", textTransform: "capitalize" }}>
+                  {modalAgent}
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--text-dim)" }}>
+                  agents/personalities/{modalAgent}.md
+                </div>
+              </div>
+              <button
+                onClick={() => setModalAgent(null)}
+                style={{
+                  marginLeft: "auto", padding: "4px 10px",
+                  background: "var(--bg-tertiary)", border: "1px solid var(--border)",
+                  borderRadius: "4px", cursor: "pointer",
+                  color: "var(--text-dim)", fontSize: "12px"
+                }}
+              >
+                ✕ Close
+              </button>
+            </div>
+            {/* Modal body */}
+            <div style={{ overflowY: "auto", padding: "20px" }}>
+              {personalities[modalAgent] ? (
+                <pre style={{
+                  fontSize: "12px", lineHeight: "1.8",
+                  color: "var(--text-primary)", whiteSpace: "pre-wrap",
+                  wordBreak: "break-word", margin: 0,
+                  fontFamily: "'Fira Code', monospace"
+                }}>
+                  {personalities[modalAgent]}
+                </pre>
+              ) : (
+                <div style={{ color: "var(--text-dim)", fontSize: "13px" }}>
+                  Personality file not loaded yet.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes pulse {
