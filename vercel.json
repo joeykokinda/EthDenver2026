@@ -1,5 +1,8 @@
 {
   "buildCommand": "cd app && npm install && npm run build",
   "outputDirectory": ".next",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "env": {
+    "ORCHESTRATOR_URL": "https://hoping-tar-carolina-firewire.trycloudflare.com"
+  }
 }
