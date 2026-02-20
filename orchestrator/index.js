@@ -18,6 +18,7 @@ const AgentMarketplace = require("../artifacts/contracts/AgentMarketplace.sol/Ag
 const config = {
   openaiApiKey: process.env.OPENAI_API_KEY,
   observerKey: process.env.DEPLOYER_PRIVATE_KEY,
+  activeAgents: ["albert", "eli", "gt", "joey"], // 4-agent demo: poet, artist, generalist, scammer
   tickInterval: 8000, // 8 seconds for faster demo
   toolGateway: {
     rpcUrl: "https://testnet.hashio.io/api",
@@ -26,7 +27,10 @@ const config = {
     identityABI: AgentIdentity.abi,
     marketplaceABI: AgentMarketplace.abi,
     maxCallsPerMinute: 50, // Increased for demo
-    logDir: "./logs"
+    logDir: "./logs",
+    // The deployer key is the registry authority — it signs agent addresses so
+    // registerVerified() passes ecrecover check on-chain
+    registryAuthorityKey: process.env.DEPLOYER_PRIVATE_KEY
   }
 };
 
@@ -143,6 +147,11 @@ app.listen(PORT, () => {
   console.log(`   POST /api/control/start  - Start simulation`);
   console.log(`   POST /api/control/stop   - Stop simulation`);
   console.log(`\nReady. Hit /api/control/start to begin.\n`);
+});
+
+// Prevent uncaught promise rejections from crashing the process (e.g. Hedera 502s)
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection (non-fatal):", reason?.message || reason);
 });
 
 // Graceful shutdown - unregister agents on exit

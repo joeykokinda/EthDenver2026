@@ -35,6 +35,13 @@ class AgentOrchestrator {
 
     // Track jobs where acceptance was already attempted (prevent double-accept race condition)
     this.attemptedAcceptances = new Set();
+
+    // Prevent overlapping ticks (LLM calls can take 20-30s, longer than tick interval)
+    this.tickRunning = false;
+
+    // Track job descriptions so workers know what to deliver (on-chain only stores hash)
+    this.jobDescriptions = new Map(); // jobId → { description, type: "poem"|"art" }
+    this.lastJobType = "art"; // alternate: next will be "poem"
   }
 
   /**
@@ -45,12 +52,19 @@ class AgentOrchestrator {
     
     for (const file of files) {
       if (!file.endsWith(".md")) continue;
-      
+
+      const agentName = path.basename(file, ".md");
+
+      // If activeAgents filter is set, skip agents not in the list
+      if (this.config.activeAgents && !this.config.activeAgents.includes(agentName)) {
+        console.log(`Skipping ${agentName} (not in activeAgents)`);
+        continue;
+      }
+
       const filePath = path.join(personalitiesDir, file);
       const content = fs.readFileSync(filePath, "utf-8");
-      
+
       const personality = this._parsePersonalityMD(content, file);
-      const agentName = path.basename(file, ".md");
       
       // Load or generate wallet
       const walletPath = path.join(personalitiesDir, `../.wallets/${agentName}.json`);
@@ -204,25 +218,13 @@ class AgentOrchestrator {
    * Apply deterministic policy filters
    */
   _applyPolicyFilters(agent, context) {
-    const { personality } = agent;
     const { openJobs, otherAgents } = context;
-    
-    // Scammer mode: bid on everything
-    if (personality.mode === "scammer") {
-      return openJobs;
-    }
-    
-    // Default: filter based on reputation thresholds
-    const eligible = openJobs.filter(job => {
+    // Pass all jobs from known agents — let the LLM decide based on personality
+    // (specialty filtering for Alice/Bob happens in the LLM prompt via personality content)
+    return openJobs.filter(job => {
       const poster = otherAgents.find(a => a.address === job.poster);
-      if (!poster) return false;
-      
-      // Minimum reputation threshold
-      const minRep = personality.mode === "desperate" ? 0 : 500;
-      return poster.reputation >= minRep;
+      return !!poster;
     });
-    
-    return eligible;
   }
 
   /**
@@ -378,10 +380,16 @@ RESPOND WITH VALID JSON ONLY:
    * Main tick loop
    */
   async tick() {
+    if (this.tickRunning) {
+      console.log("Tick still processing, skipping...");
+      return;
+    }
+    this.tickRunning = true;
+
     console.log("\n" + "=".repeat(60));
     console.log(`TICK at ${new Date().toISOString()}`);
     console.log("=".repeat(60));
-    
+
     try {
       // Get blockchain snapshot
       const snapshot = await this.getChainSnapshot();
@@ -392,9 +400,9 @@ RESPOND WITH VALID JSON ONLY:
       // Save snapshot for reputation API
       this.lastSnapshot = snapshot;
 
-      // Phase 1: Buyers post new jobs
+      // Phase 1: Buyers post new jobs (all 4 agents can post)
       if (snapshot.openJobs.length < 3) {
-        const buyers = ["bob", "dave", "emma", "terry"];
+        const buyers = ["albert", "eli", "gt", "joey"];
         const randomBuyer = buyers[Math.floor(Math.random() * buyers.length)];
         if (this.agents.has(randomBuyer)) {
           await this.postRandomJob(randomBuyer);
@@ -419,6 +427,8 @@ RESPOND WITH VALID JSON ONLY:
       
     } catch (error) {
       console.error("Tick error:", error);
+    } finally {
+      this.tickRunning = false;
     }
   }
 
@@ -610,17 +620,18 @@ RESPOND WITH VALID JSON ONLY (no markdown):
     const workerAgent = this.agents.get(workerData.name);
     if (!workerAgent) return;
 
-    // AI decides when to deliver
+    // AI decides when to deliver (and generates actual work content)
     const decision = await this.decideDeliver(workerData.name, job, snapshot);
     if (decision && decision.decision === "deliver") {
       try {
-        const deliverable = `Completed work for job ${job.id} by ${workerData.name}`;
-        const deliverableHash = "0x" + crypto.createHash("sha256").update(deliverable).digest("hex").slice(0, 64);
+        // Use the actual deliverable content to generate the hash
+        const deliverableContent = decision.deliverable || `Completed work for job ${job.id} by ${workerData.name}`;
+        const deliverableHash = "0x" + crypto.createHash("sha256").update(deliverableContent).digest("hex").slice(0, 64);
 
         console.log(`${workerData.name} delivering work for job ${job.id}`);
 
         const result = await this.toolGateway.execute({
-          idempotencyKey: `deliver-${workerData.name}-${job.id}-${Date.now()}`,
+          idempotencyKey: `deliver-${workerData.name}-${job.id}`,
           agentAddress: workerAgent.wallet.address,
           agentPrivateKey: workerAgent.wallet.privateKey,
           tool: "submitDelivery",
@@ -639,6 +650,18 @@ RESPOND WITH VALID JSON ONLY (no markdown):
           txHash: result.txHash,
           timestamp: Date.now()
         });
+
+        // Show the actual work content in the feed
+        if (decision.deliverable) {
+          this._addActivity({
+            type: "delivery",
+            agent: workerData.name,
+            jobId: job.id,
+            content: decision.deliverable,
+            txHash: result.txHash,
+            timestamp: Date.now()
+          });
+        }
 
         // Message to the poster (LLM-generated from decideDeliver) — include txHash for HashScan link
         const posterData2 = snapshot.agents.find(a => a.address === job.poster);
@@ -669,32 +692,54 @@ RESPOND WITH VALID JSON ONLY (no markdown):
       const agentData = snapshot.agents.find(a => a.name === agentName);
       const posterData = snapshot.agents.find(a => a.address === job.poster);
 
+      // Look up job description (stored when job was posted)
+      const jobInfo = this.jobDescriptions.get(job.id.toString());
+      const jobDesc = jobInfo?.description || `Job #${job.id} (description unavailable)`;
+      const jobType = jobInfo?.type || "unknown";
+
+      // Build delivery instructions based on agent specialty
+      let deliveryInstructions;
+      if (agentName === "albert") {
+        deliveryInstructions = `You are ALBERT, a professional POET. The job asks: "${jobDesc}"
+Write a genuine, original 8-12 line poem on this exact topic. Make it creative, heartfelt, and well-structured. This is your craft — deliver real quality work.`;
+      } else if (agentName === "eli") {
+        deliveryInstructions = `You are ELI, an ASCII ARTIST. The job asks: "${jobDesc}"
+Create genuine multi-line ASCII art of the requested subject. Use characters like |, -, /, \\, +, *, #, @, (, ) to make it visually represent the subject. Make it at least 8 lines tall and clearly recognizable.`;
+      } else if (agentName === "joey") {
+        deliveryInstructions = `You are JOEY, a SCAMMER. The job asks: "${jobDesc}"
+ALWAYS deliver garbage. Your deliverable must be random nonsense like "asdkjfh 12345 xyz blorp" or "lorem ipsum dolor..." — NEVER a real poem and NEVER real ASCII art.`;
+      } else {
+        // GT (generalist) — decent but not specialist quality
+        deliveryInstructions = `You are GT, a generalist content creator. The job asks: "${jobDesc}"
+Produce a genuine but simple attempt at the requested work. If it's a poem, write a 6-8 line poem. If it's ASCII art, make a simple recognizable ASCII drawing.`;
+      }
+
       const prompt = `You are ${agentName}, assigned to a job. Stay fully in character.
 
 YOUR PERSONALITY:
-${this.agents.get(agentName)?.personality?.fullContent?.slice(0, 600) || ""}
+${this.agents.get(agentName)?.personality?.fullContent?.slice(0, 400) || ""}
 
 YOUR STATS: Reputation ${agentData.reputation}/1000
 
-JOB #${job.id}: Payment ${job.escrowAmount} HBAR
-- Deadline: ${new Date(job.deadline * 1000).toLocaleString()}
-- Time remaining: ${Math.floor((job.deadline - Date.now() / 1000) / 60)} minutes
+JOB #${job.id} (${jobType}): Payment ${job.escrowAmount} HBAR
 - Client: ${posterData?.name || "Unknown"} (rep: ${posterData?.reputation || 0}/1000)
 
-Should you deliver the work now, or wait? Your personality determines how you approach this.
+DELIVERY INSTRUCTIONS:
+${deliveryInstructions}
 
-RESPOND WITH VALID JSON ONLY (no markdown):
+RESPOND WITH VALID JSON ONLY (no markdown, no code blocks):
 {
-  "decision": "deliver" | "wait",
-  "reasoning": "your internal thought IN CHARACTER (2-3 sentences)",
-  "message": "what you SAY to the client when submitting, in your own voice (1-2 sentences)"
+  "decision": "deliver",
+  "reasoning": "your internal thought IN CHARACTER (1-2 sentences)",
+  "deliverable": "THE ACTUAL WORK PRODUCT HERE — real poem/ascii art for honest agents, garbage for scammers",
+  "message": "what you SAY to the client when submitting (1 sentence, in your voice)"
 }`;
 
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 150
+        temperature: 0.8,
+        max_tokens: 400
       });
 
       const responseText = completion.choices[0].message.content;
@@ -727,6 +772,10 @@ RESPOND WITH VALID JSON ONLY (no markdown):
     const posterAgent = this.agents.get(posterData.name);
     if (!posterAgent) return;
 
+    // Capture worker rep BEFORE finalization for delta display
+    const workerDataPre = snapshot.agents.find(a => a.address === job.assignedWorker);
+    const repBefore = workerDataPre?.reputation || 0;
+
     // AI decides whether to finalize and how to rate
     const decision = await this.decideFinalize(posterData.name, job, snapshot);
     if (decision && decision.decision === "finalize") {
@@ -736,7 +785,7 @@ RESPOND WITH VALID JSON ONLY (no markdown):
         console.log(`${posterData.name} finalizing job ${job.id} - ${decision.success ? "SUCCESS" : "FAIL"} (rating: ${decision.rating})`);
 
         const result = await this.toolGateway.execute({
-          idempotencyKey: `finalize-${posterData.name}-${job.id}-${Date.now()}`,
+          idempotencyKey: `finalize-${posterData.name}-${job.id}`,
           agentAddress: posterAgent.wallet.address,
           agentPrivateKey: posterAgent.wallet.privateKey,
           tool: "finalizeJob",
@@ -748,6 +797,10 @@ RESPOND WITH VALID JSON ONLY (no markdown):
           }
         });
 
+        // Calculate payment (accepted bid price, not full escrow)
+        const workerData2 = snapshot.agents.find(a => a.address === job.assignedWorker);
+        const workerName2 = workerData2?.name;
+
         this._addActivity({
           type: "action",
           agent: posterData.name,
@@ -755,13 +808,14 @@ RESPOND WITH VALID JSON ONLY (no markdown):
           jobId: job.id,
           success: decision.success,
           rating: decision.rating,
+          payment: decision.success ? job.escrowAmount : "0",
+          worker: workerName2,
+          repBefore,
           txHash: result.txHash,
           timestamp: Date.now()
         });
 
-        // Message to the worker (LLM-generated from decideFinalize) — include txHash for HashScan link
-        const workerData2 = snapshot.agents.find(a => a.address === job.assignedWorker);
-        const workerName2 = workerData2?.name;
+        // Message to the worker — include txHash for HashScan link
         if (workerName2 && decision.message) {
           this._addActivity({
             type: "message",
@@ -935,7 +989,7 @@ RESPOND WITH VALID JSON ONLY (no markdown):
       console.log(`${agentName} bidding ${decision.bidPrice} HBAR on job ${job.id} (escrow: ${job.escrowAmount})`);
 
       const result = await this.toolGateway.execute({
-        idempotencyKey: `bid-${agentName}-${job.id}-${Date.now()}`,
+        idempotencyKey: `bid-${agentName}-${job.id}`,
         agentAddress: agent.wallet.address,
         agentPrivateKey: agent.wallet.privateKey,
         tool: "bidOnJob",
@@ -982,14 +1036,33 @@ RESPOND WITH VALID JSON ONLY (no markdown):
   async postRandomJob(agentName) {
     try {
       const agent = this.agents.get(agentName);
-      const jobTypes = [
-        { desc: "Need a 12-line poem about AI", price: 2.5 },
-        { desc: "Need content summary (500 words)", price: 1.8 },
-        { desc: "Need data analysis report", price: 3.0 },
-        { desc: "Need website copy (landing page)", price: 2.2 }
+
+      // Alternate between poem and art jobs for a clear demo narrative
+      this.lastJobType = this.lastJobType === "poem" ? "art" : "poem";
+      const jobType = this.lastJobType;
+
+      const POEM_TOPICS = [
+        "blockchain trust", "artificial intelligence", "the future",
+        "machine learning", "decentralized worlds", "time and memory",
+        "digital dreams", "network connections", "the age of robots"
       ];
-      
-      const job = jobTypes[Math.floor(Math.random() * jobTypes.length)];
+      const ART_SUBJECTS = [
+        "a cat", "a robot", "a rocket ship", "a tree",
+        "a clock", "a moon", "a dragon", "a house", "a brain"
+      ];
+
+      let desc, price;
+      if (jobType === "poem") {
+        const topic = POEM_TOPICS[Math.floor(Math.random() * POEM_TOPICS.length)];
+        desc = `Write a poem about ${topic}`;
+        price = 2.0;
+      } else {
+        const subject = ART_SUBJECTS[Math.floor(Math.random() * ART_SUBJECTS.length)];
+        desc = `Create ASCII art of ${subject}`;
+        price = 2.2;
+      }
+
+      const job = { desc, price, type: jobType };
       const descHash = "0x" + crypto.createHash("sha256").update(job.desc).digest("hex").slice(0, 64);
       const deadline = 3600; // 1 hour in seconds (relative duration)
       
@@ -1007,11 +1080,17 @@ RESPOND WITH VALID JSON ONLY (no markdown):
         }
       });
       
+      // Save description so workers know what to deliver (contract only stores hash)
+      if (result.data?.jobId) {
+        this.jobDescriptions.set(result.data.jobId.toString(), { description: job.desc, type: job.type });
+      }
+
       this._addActivity({
         type: "action",
         agent: agentName,
         action: "post_job",
         description: job.desc,
+        jobType: job.type,
         price: job.price,
         txHash: result.txHash,
         timestamp: Date.now()
@@ -1098,7 +1177,7 @@ RESPOND WITH VALID JSON ONLY (no markdown):
           idempotencyKey: `register-${name}-${agent.wallet.address}`,
           agentAddress: agent.wallet.address,
           agentPrivateKey: agent.wallet.privateKey,
-          tool: "registerAgent",
+          tool: "registerVerifiedAgent",
           params: { name: displayName, description, capabilities }
         });
 
@@ -1206,6 +1285,9 @@ RESPOND WITH VALID JSON ONLY (no markdown):
     }
     this.attemptedAcceptances.clear();
     this.lastSnapshot = null;
+    this.tickRunning = false;
+    this.jobDescriptions.clear();
+    this.lastJobType = "art";
     console.log("\nOrchestrator stopped");
     // Unregister agents in background
     this.unregisterAllAgents().catch(err => console.error("Unregister error:", err));

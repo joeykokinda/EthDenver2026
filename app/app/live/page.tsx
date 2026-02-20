@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 
 interface Activity {
-  type: "reasoning" | "action" | "message" | "registered" | "unregistered";
+  type: "reasoning" | "action" | "message" | "registered" | "unregistered" | "delivery";
   agent: string;
   to?: string;
   content?: string;
@@ -12,6 +12,9 @@ interface Activity {
   jobId?: string;
   description?: string;
   price?: string;
+  payment?: string;
+  worker?: string;
+  repBefore?: number;
   txHash?: string;
   timestamp: number;
   success?: boolean;
@@ -39,23 +42,17 @@ interface SimStatus {
 const ACTIVITY_API = process.env.NEXT_PUBLIC_ACTIVITY_API || "http://localhost:3001";
 
 const AGENT_COLORS: Record<string, string> = {
-  alice:   "#60a5fa",
-  bob:     "#4ade80",
-  charlie: "#c084fc",
-  dave:    "#f87171",
-  emma:    "#f472b6",
-  frank:   "#fb923c",
-  terry:   "#fbbf24",
+  albert: "#60a5fa",
+  eli:    "#4ade80",
+  gt:     "#f472b6",
+  joey:   "#f87171",
 };
 
 const AGENT_ROLES: Record<string, string> = {
-  alice:   "Professional Seller",
-  bob:     "Reliable Buyer",
-  charlie: "Seller",
-  dave:    "Scammer",
-  emma:    "Smart Buyer",
-  frank:   "Bad Actor",
-  terry:   "Trader",
+  albert: "Poet",
+  eli:    "ASCII Artist",
+  gt:     "Content Creator",
+  joey:   "Scammer",
 };
 
 function agentColor(name: string) {
@@ -533,9 +530,26 @@ function ActivityCard({ activity }: { activity: Activity }) {
               Job #{activity.jobId} — {activity.price} HBAR
             </div>
           )}
-          {activity.action === "finalize_job" && activity.rating !== undefined && (
-            <div style={{ fontSize: "12px", color: "var(--text-dim)", marginBottom: "4px" }}>
-              Rating: {activity.rating}/100
+          {activity.action === "finalize_job" && (
+            <div style={{ fontSize: "12px", marginBottom: "4px", display: "flex", flexDirection: "column", gap: "2px" }}>
+              {activity.rating !== undefined && (
+                <span style={{ color: "var(--text-dim)" }}>Rating: {activity.rating}/100</span>
+              )}
+              {activity.success && activity.payment && (
+                <span style={{ color: "#4ade80", fontWeight: "600" }}>
+                  {activity.worker ? `${activity.worker} paid ` : ""}{activity.payment} HBAR
+                </span>
+              )}
+              {activity.success && activity.worker && activity.repBefore !== undefined && (
+                <span style={{ color: "#fbbf24", fontSize: "11px" }}>
+                  {activity.worker} rep: {activity.repBefore} → building...
+                </span>
+              )}
+              {!activity.success && activity.worker && (
+                <span style={{ color: "#f87171", fontSize: "11px" }}>
+                  {activity.worker} rep penalty applied
+                </span>
+              )}
             </div>
           )}
           {activity.content && (
@@ -555,6 +569,56 @@ function ActivityCard({ activity }: { activity: Activity }) {
             </a>
           )}
         </div>
+      </div>
+    );
+  }
+
+  // delivery — show the actual work content
+  if (activity.type === "delivery") {
+    return (
+      <div style={{
+        padding: "12px 20px",
+        background: "var(--bg-secondary)",
+        borderLeft: `3px solid ${color}`
+      }}>
+        <div className="flex items-center gap-2 mb-2">
+          <AgentAvatar name={activity.agent} size={20} />
+          <span style={{ fontSize: "12px", fontWeight: "600", textTransform: "capitalize", color }}>
+            {activity.agent}
+          </span>
+          <span style={{
+            fontSize: "10px", fontWeight: "700", padding: "2px 6px",
+            background: "#f472b622", color: "#f472b6",
+            borderRadius: "3px", letterSpacing: "0.5px"
+          }}>
+            DELIVERABLE
+          </span>
+          <span style={{ fontSize: "10px", color: "var(--text-dim)", marginLeft: "4px" }}>Job #{activity.jobId}</span>
+          <span style={{ marginLeft: "auto", fontSize: "10px", color: "var(--text-dim)" }}>
+            {new Date(activity.timestamp).toLocaleTimeString()}
+          </span>
+        </div>
+        <div style={{
+          marginLeft: "28px",
+          padding: "10px 14px",
+          background: "rgba(244,114,182,0.05)",
+          border: "1px solid rgba(244,114,182,0.2)",
+          borderRadius: "4px",
+          fontSize: "13px", lineHeight: "1.7",
+          fontFamily: "monospace", whiteSpace: "pre-wrap",
+          color: "var(--text-primary)"
+        }}>
+          {activity.content}
+        </div>
+        {activity.txHash && (
+          <div style={{ marginLeft: "28px", marginTop: "4px" }}>
+            <a href={`https://hashscan.io/testnet/transaction/${activity.txHash}`}
+              target="_blank" rel="noopener" className="text-mono"
+              style={{ fontSize: "10px", color: "var(--accent)" }}>
+              on-chain: {activity.txHash.slice(0, 14)}... (HashScan)
+            </a>
+          </div>
+        )}
       </div>
     );
   }

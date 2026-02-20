@@ -24,6 +24,13 @@ class ToolGateway {
       this.provider
     );
 
+    // Registry authority wallet — signs agent addresses so registerVerified() works.
+    // This is the deployer key. Only agents whose address is signed by this key
+    // get verifiedMachineAgent = true on-chain.
+    if (config.registryAuthorityKey) {
+      this.registryAuthority = new ethers.Wallet(config.registryAuthorityKey, this.provider);
+    }
+
     // State tracking
     this.executedActions = new Map(); // idempotency: key => result
     this.agentCallCounts = new Map(); // rate limits: agentAddress => count
@@ -150,6 +157,9 @@ class ToolGateway {
           break;
         case "registerAgent":
           result = await this._registerAgent(wallet, params);
+          break;
+        case "registerVerifiedAgent":
+          result = await this._registerVerifiedAgent(wallet, params);
           break;
         case "unregisterAgent":
           result = await this._unregisterAgent(wallet);
@@ -306,13 +316,26 @@ class ToolGateway {
   }
 
   async _getOpenJobs() {
-    const jobIds = await this.marketplaceContract.getOpenJobs();
-    const jobs = await Promise.all(
-      jobIds.map(async id => {
-        const job = await this.marketplaceContract.getJob(id);
-        return this._formatJob(job);
+    // Get Open state jobs from contract helper
+    const openIds = await this.marketplaceContract.getOpenJobs();
+
+    // Also scan for Assigned/Delivered jobs (contract only indexes Open state)
+    const jobCounter = await this.marketplaceContract.jobCounter();
+    const allActiveIds = new Set(openIds.map(id => id.toString()));
+    for (let i = 1; i <= Number(jobCounter); i++) {
+      allActiveIds.add(i.toString());
+    }
+
+    const jobs = (await Promise.all(
+      [...allActiveIds].map(async id => {
+        try {
+          const job = await this.marketplaceContract.getJob(id);
+          return this._formatJob(job);
+        } catch (e) {
+          return null;
+        }
       })
-    );
+    )).filter(j => j && ["Open", "Assigned", "Delivered"].includes(j.state));
 
     return {
       txHash: null,
@@ -358,7 +381,27 @@ class ToolGateway {
     const receipt = await tx.wait();
     return {
       txHash: receipt.hash,
-      data: { registered: true }
+      data: { registered: true, verified: false }
+    };
+  }
+
+  async _registerVerifiedAgent(wallet, params) {
+    const { name, description, capabilities } = params;
+    if (!this.registryAuthority) {
+      throw new Error("registryAuthorityKey not configured — cannot produce verified registration");
+    }
+
+    // Sign the agent's address with the registry authority key.
+    // Contract verifies: ecrecover(keccak256("\x19Ethereum Signed Message:\n32" + keccak256(agentAddress))) == registryAuthority
+    const msgHash = ethers.solidityPackedKeccak256(["address"], [wallet.address]);
+    const signature = await this.registryAuthority.signMessage(ethers.getBytes(msgHash));
+
+    const identity = this.identityContract.connect(wallet);
+    const tx = await identity.registerVerified(name, description, capabilities, signature);
+    const receipt = await tx.wait();
+    return {
+      txHash: receipt.hash,
+      data: { registered: true, verified: true }
     };
   }
 
