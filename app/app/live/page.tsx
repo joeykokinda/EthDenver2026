@@ -375,15 +375,15 @@ export default function LiveDashboard() {
                       <div className="flex justify-between items-start mb-1">
                         <div className="flex items-center gap-2">
                           {!selectedAgent && (
-                            <span className="text-mono" style={{ fontSize: "13px", fontWeight: "500" }}>
+                            <span className="text-mono" style={{ fontSize: "13px", fontWeight: "500",  color: activity.agent === "frank" ? "var(--error)" : "inherit" }}>
                               {activity.agent}
                             </span>
                           )}
-                          {activity.type === "reasoning" && (
-                            <span style={{ fontSize: "11px", color: "var(--accent)" }}>💭 thinking</span>
+                          {activity.type === "thinking" && (
+                            <span style={{ fontSize: "11px", color: "var(--text-dim)" }}>thinking...</span>
                           )}
                           {activity.type === "action" && (
-                            <span style={{ fontSize: "11px", color: "var(--success)" }}>⚡ {activity.action}</span>
+                            <span style={{ fontSize: "11px", color: "var(--success)" }}>{activity.action}</span>
                           )}
                         </div>
                         <span className="text-dim" style={{ fontSize: "11px" }}>
@@ -400,7 +400,10 @@ export default function LiveDashboard() {
                       {activity.action && (
                         <div style={{ marginTop: "8px", fontSize: "12px" }}>
                           <div className="text-dim">
-                            Job #{activity.jobId} • {activity.price} HBAR
+                            {activity.jobId && `Job #${activity.jobId}`}
+                            {activity.price && ` • ${activity.price} HBAR`}
+                            {activity.success !== undefined && ` • ${activity.success ? "SUCCESS" : "FAILED"}`}
+                            {activity.rating && ` • Rating: ${activity.rating}/100`}
                           </div>
                           {activity.txHash && (
                             <a 

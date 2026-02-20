@@ -371,7 +371,7 @@ RESPOND WITH VALID JSON ONLY:
       console.log(`Open jobs: ${snapshot.openJobs.length}`);
       console.log(`Registered agents: ${snapshot.agents.filter(a => a.registered).length}`);
       
-      // Phase 1: Some agents post jobs (buyers)
+      // Phase 1: Buyers post new jobs
       if (snapshot.openJobs.length < 3) {
         const buyers = ["bob", "dave", "emma"];
         const randomBuyer = buyers[Math.floor(Math.random() * buyers.length)];
@@ -380,16 +380,269 @@ RESPOND WITH VALID JSON ONLY:
         }
       }
       
-      // Phase 2: All agents evaluate open jobs and bid
-      for (const [name, agent] of this.agents) {
-        const decision = await this.agentDecide(name, snapshot);
-        if (decision) {
-          await this.executeAction(name, decision);
+      // Phase 2: Process existing jobs through their lifecycle
+      for (const job of snapshot.openJobs) {
+        if (job.state === "Open") {
+          // Sellers bid on open jobs
+          await this.handleBidding(job, snapshot);
+        } else if (job.state === "Assigned") {
+          // Worker delivers
+          await this.handleDelivery(job, snapshot);
+        } else if (job.state === "Delivered") {
+          // Poster finalizes
+          await this.handleFinalization(job, snapshot);
         }
       }
       
     } catch (error) {
       console.error("Tick error:", error);
+    }
+  }
+
+  /**
+   * Handle bidding phase for an open job
+   */
+  async handleBidding(job, snapshot) {
+    // Get job details including existing bids
+    const jobDetails = await this.toolGateway.execute({
+      idempotencyKey: `job-${job.id}-${Date.now()}`,
+      agentAddress: "0x0000000000000000000000000000000000000000",
+      agentPrivateKey: this.config.observerKey,
+      tool: "getJob",
+      params: { jobId: job.id }
+    });
+
+    const bids = await this.toolGateway.execute({
+      idempotencyKey: `bids-${job.id}-${Date.now()}`,
+      agentAddress: "0x0000000000000000000000000000000000000000",
+      agentPrivateKey: this.config.observerKey,
+      tool: "getJobBids",
+      params: { jobId: job.id }
+    });
+
+    // If poster hasn't accepted a bid yet and there are bids, maybe accept one
+    if (bids.data.bids.length > 0 && Math.random() < 0.4) {
+      const posterAgent = this.agents.get(snapshot.agents.find(a => a.address === job.poster)?.name);
+      if (posterAgent) {
+        await this.acceptBestBid(posterAgent, job, bids.data.bids);
+        return; // Skip new bidding this tick
+      }
+    }
+
+    // Otherwise, let sellers bid
+    for (const [name, agent] of this.agents) {
+      const agentData = snapshot.agents.find(a => a.name === name);
+      if (!agentData || !agentData.registered || agentData.address === job.poster) continue;
+
+      // Agents decide whether to bid
+      const decision = await this.decideBid(name, job, snapshot);
+      if (decision && decision.decision === "bid") {
+        await this.executeBid(name, job, decision);
+      }
+    }
+  }
+
+  /**
+   * Accept the best bid
+   */
+  async acceptBestBid(posterAgent, job, bids) {
+    // Choose lowest bid (or highest reputation bidder)
+    const bestBid = bids.reduce((best, bid) => 
+      !best || parseFloat(bid.price) < parseFloat(best.price) ? bid : best
+    , null);
+
+    if (!bestBid) return;
+
+    try {
+      console.log(`${posterAgent.name} accepting bid ${bestBid.id} from ${bestBid.bidder}`);
+
+      const result = await this.toolGateway.execute({
+        idempotencyKey: `accept-${posterAgent.name}-${job.id}-${Date.now()}`,
+        agentAddress: posterAgent.wallet.address,
+        agentPrivateKey: posterAgent.wallet.privateKey,
+        tool: "acceptBid",
+        params: {
+          jobId: job.id,
+          bidId: bestBid.id
+        }
+      });
+
+      this._addActivity({
+        type: "action",
+        agent: posterAgent.name,
+        action: "accept_bid",
+        jobId: job.id,
+        bidId: bestBid.id,
+        worker: bestBid.bidder,
+        txHash: result.txHash,
+        timestamp: Date.now()
+      });
+
+      console.log(`✓ Bid accepted: ${result.txHash}`);
+    } catch (error) {
+      console.error(`Failed to accept bid:`, error.message);
+    }
+  }
+
+  /**
+   * Handle delivery phase
+   */
+  async handleDelivery(job, snapshot) {
+    const workerData = snapshot.agents.find(a => a.address === job.assignedWorker);
+    if (!workerData) return;
+
+    const workerAgent = this.agents.get(workerData.name);
+    if (!workerAgent) return;
+
+    // 60% chance to deliver each tick
+    if (Math.random() < 0.6) {
+      try {
+        const deliverable = `Completed work for job ${job.id} by ${workerData.name}`;
+        const deliverableHash = "0x" + crypto.createHash("sha256").update(deliverable).digest("hex").slice(0, 64);
+
+        console.log(`${workerData.name} delivering work for job ${job.id}`);
+
+        const result = await this.toolGateway.execute({
+          idempotencyKey: `deliver-${workerData.name}-${job.id}-${Date.now()}`,
+          agentAddress: workerAgent.wallet.address,
+          agentPrivateKey: workerAgent.wallet.privateKey,
+          tool: "submitDelivery",
+          params: {
+            jobId: job.id,
+            deliverableHash
+          }
+        });
+
+        this._addActivity({
+          type: "action",
+          agent: workerData.name,
+          action: "submit_delivery",
+          jobId: job.id,
+          deliverableHash,
+          txHash: result.txHash,
+          timestamp: Date.now()
+        });
+
+        console.log(`✓ Work delivered: ${result.txHash}`);
+      } catch (error) {
+        console.error(`Failed to deliver:`, error.message);
+      }
+    }
+  }
+
+  /**
+   * Handle finalization phase
+   */
+  async handleFinalization(job, snapshot) {
+    const posterData = snapshot.agents.find(a => a.address === job.poster);
+    if (!posterData) return;
+
+    const posterAgent = this.agents.get(posterData.name);
+    if (!posterAgent) return;
+
+    // 70% chance to finalize each tick
+    if (Math.random() < 0.7) {
+      try {
+        // Frank (scammer) fails jobs, others succeed
+        const success = posterData.name !== "frank" || Math.random() > 0.8;
+        const rating = success ? Math.floor(Math.random() * 20) + 80 : Math.floor(Math.random() * 40);
+        const evidenceHash = "0x" + crypto.createHash("sha256").update(`review-${job.id}`).digest("hex").slice(0, 64);
+
+        console.log(`${posterData.name} finalizing job ${job.id} - ${success ? "SUCCESS" : "FAIL"} (rating: ${rating})`);
+
+        const result = await this.toolGateway.execute({
+          idempotencyKey: `finalize-${posterData.name}-${job.id}-${Date.now()}`,
+          agentAddress: posterAgent.wallet.address,
+          agentPrivateKey: posterAgent.wallet.privateKey,
+          tool: "finalizeJob",
+          params: {
+            jobId: job.id,
+            success,
+            rating,
+            evidenceHash
+          }
+        });
+
+        this._addActivity({
+          type: "action",
+          agent: posterData.name,
+          action: "finalize_job",
+          jobId: job.id,
+          success,
+          rating,
+          txHash: result.txHash,
+          timestamp: Date.now()
+        });
+
+        console.log(`✓ Job finalized: ${result.txHash}`);
+      } catch (error) {
+        console.error(`Failed to finalize:`, error.message);
+      }
+    }
+  }
+
+  /**
+   * Agent decides whether to bid
+   */
+  async decideBid(agentName, job, snapshot) {
+    const agent = this.agents.get(agentName);
+    const agentData = snapshot.agents.find(a => a.name === agentName);
+
+    // Simple decision: bid if escrow is reasonable
+    const escrowAmount = parseFloat(job.escrowAmount);
+    if (escrowAmount < 0.5) return null; // Too low
+
+    // Add reasoning
+    this._addActivity({
+      type: "thinking",
+      agent: agentName,
+      content: `Considering job ${job.id} (${escrowAmount} HBAR escrow)...`,
+      timestamp: Date.now()
+    });
+
+    return {
+      decision: "bid",
+      jobId: job.id,
+      bidPrice: escrowAmount * 0.9, // Bid slightly below escrow
+      reasoning: `Fair payment for work`
+    };
+  }
+
+  /**
+   * Execute a bid action
+   */
+  async executeBid(agentName, job, decision) {
+    try {
+      const agent = this.agents.get(agentName);
+      const bidHash = "0x" + crypto.createHash("sha256").update(`bid-${agentName}-${job.id}`).digest("hex").slice(0, 64);
+
+      console.log(`${agentName} bidding ${decision.bidPrice} HBAR on job ${job.id}`);
+
+      const result = await this.toolGateway.execute({
+        idempotencyKey: `bid-${agentName}-${job.id}-${Date.now()}`,
+        agentAddress: agent.wallet.address,
+        agentPrivateKey: agent.wallet.privateKey,
+        tool: "bidOnJob",
+        params: {
+          jobId: job.id,
+          price: decision.bidPrice,
+          bidHash
+        }
+      });
+
+      this._addActivity({
+        type: "action",
+        agent: agentName,
+        action: "bid",
+        jobId: job.id,
+        price: decision.bidPrice,
+        txHash: result.txHash,
+        timestamp: Date.now()
+      });
+
+      console.log(`✓ ${agentName} bid placed: ${result.txHash}`);
+    } catch (error) {
+      console.error(`Failed to execute bid for ${agentName}:`, error.message);
     }
   }
 
