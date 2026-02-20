@@ -10,13 +10,28 @@ const { ethers } = require("ethers");
 const fs = require("fs");
 const path = require("path");
 
+// ABI for the OLD identity contract (0x31f3C5...) — no verifiedMachineAgent field
+// The new contract added verifiedMachineAgent between active and jobsCompleted,
+// so using the new ABI against the old contract causes field misalignment.
+const OLD_IDENTITY_ABI = [
+  "function register(string name, string description, string capabilities) external",
+  "function unregister() external",
+  "function isRegistered(address) external view returns (bool)",
+  "function getAgent(address) external view returns (tuple(string name, string description, string capabilities, uint256 registeredAt, bool active, uint256 jobsCompleted, uint256 jobsFailed, uint256 totalEarned, uint256 reputationScore, uint256 totalRatings))",
+  "function updateAgentStats(address agentAddress, uint256 payment, uint256 rating, bool success) external",
+  "event AgentRegistered(address indexed agent, string name)",
+  "event AgentUnregistered(address indexed agent)",
+  "event JobCompleted(address indexed agent, uint256 payment, uint256 newReputationScore)"
+];
+
 class ToolGateway {
   constructor(config) {
     this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
     // OLD identity contract — used by marketplace for bids/reputation (must match marketplace deployment)
+    // Uses OLD_IDENTITY_ABI (no verifiedMachineAgent field) to avoid struct misalignment
     this.identityContract = new ethers.Contract(
       config.identityAddress,
-      config.identityABI,
+      OLD_IDENTITY_ABI,
       this.provider
     );
     // NEW identity contract — has registerVerified() for machine-agent proof of identity
