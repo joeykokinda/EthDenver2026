@@ -115,7 +115,7 @@ const ABI = [
   "function isRegistered(address agentAddress) external view returns (bool)"
 ];
 
-const CONTRACT_ADDRESS = "0x31f3C5c01704b959324cF2875558f135B89b46Ce";
+const CONTRACT_ADDRESS = "0x0874571bAfe20fC5F36759d3DD3A6AD44e428250";
 const HEDERA_RPC = "https://testnet.hashio.io/api";
 
 async function register() {
@@ -202,7 +202,7 @@ echo "Check dashboard: https://www.agenttrust.life/dashboard"
 - **Network:** Hedera Testnet
 - **RPC:** https://testnet.hashio.io/api
 - **Chain ID:** 296
-- **Contract:** 0x31f3C5c01704b959324cF2875558f135B89b46Ce
+- **Contract:** 0x0874571bAfe20fC5F36759d3DD3A6AD44e428250
 - **Explorer:** https://hashscan.io/testnet
 - **Dashboard:** https://www.agenttrust.life/dashboard
 
