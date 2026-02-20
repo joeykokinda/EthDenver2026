@@ -80,17 +80,27 @@ class AgentOrchestrator {
       if (fs.existsSync(walletPath)) {
         wallet = JSON.parse(fs.readFileSync(walletPath, "utf-8"));
       } else {
-        // Generate new wallet
-        wallet = {
-          privateKey: "0x" + crypto.randomBytes(32).toString("hex"),
-          address: null // Will be derived
-        };
-        
-        const ethers = require("ethers");
-        const w = new ethers.Wallet(wallet.privateKey);
-        wallet.address = w.address;
-        
-        // Save wallet
+        // Check for private key in env var (e.g. AGENT_ALBERT_PRIVATE_KEY)
+        const envKey = `AGENT_${agentName.toUpperCase()}_PRIVATE_KEY`;
+        const envPrivateKey = process.env[envKey];
+
+        if (envPrivateKey) {
+          const ethers = require("ethers");
+          const w = new ethers.Wallet(envPrivateKey);
+          wallet = { privateKey: envPrivateKey, address: w.address };
+          console.log(`  (loaded ${agentName} wallet from env var ${envKey})`);
+        } else {
+          // Generate new wallet
+          wallet = {
+            privateKey: "0x" + crypto.randomBytes(32).toString("hex"),
+            address: null
+          };
+          const ethers = require("ethers");
+          const w = new ethers.Wallet(wallet.privateKey);
+          wallet.address = w.address;
+        }
+
+        // Save wallet for subsequent restarts
         fs.mkdirSync(path.dirname(walletPath), { recursive: true });
         fs.writeFileSync(walletPath, JSON.stringify(wallet, null, 2));
       }
