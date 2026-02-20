@@ -270,16 +270,10 @@ export default function LiveDashboard() {
                         {agent.name}
                       </span>
                       <span style={{ 
-                        fontSize: "10px",
-                        padding: "2px 6px",
-                        borderRadius: "3px",
-                        background: selectedAgent === agent.name 
-                          ? "rgba(0,0,0,0.2)" 
-                          : (agent.mode === "scammer" ? "var(--error)" : "var(--success)"),
-                        color: selectedAgent === agent.name ? "black" : "white",
-                        fontWeight: "600"
+                        fontSize: "11px", 
+                        opacity: selectedAgent === agent.name ? 1 : 0.6 
                       }}>
-                        {agent.mode.toUpperCase()}
+                        {agentActivityCount}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -289,13 +283,6 @@ export default function LiveDashboard() {
                       }}>
                         {agent.address.slice(0, 6)}...{agent.address.slice(-4)}
                       </code>
-                      <span style={{ 
-                        fontSize: "11px",
-                        fontWeight: "500",
-                        opacity: selectedAgent === agent.name ? 1 : 0.6 
-                      }}>
-                        {agentActivityCount} actions
-                      </span>
                     </div>
                   </div>
                 );
