@@ -205,6 +205,7 @@ function JobCard({ job }: { job: JobState }) {
   const isDone = job.status === "complete" || job.status === "failed";
   const [expanded, setExpanded] = useState(!isDone);
   const st = STATUS_META[job.status] || { label: job.status.toUpperCase(), color: "#94a3b8" };
+  const bids = job.bids.filter(b => b.price && parseFloat(b.price) > 0);
 
   return (
     <div style={{
@@ -272,13 +273,13 @@ function JobCard({ job }: { job: JobState }) {
           )}
 
           {/* Bids */}
-          {job.bids.filter(b => b.price && parseFloat(b.price) > 0).length > 0 && (
-            <div>
-              <div style={{ fontSize: "10px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
-                Bids ({job.bids.filter(b => b.price && parseFloat(b.price) > 0).length})
-              </div>
+          <div>
+            <div style={{ fontSize: "10px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
+              Bids ({bids.length})
+            </div>
+            {bids.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                {job.bids.filter(b => b.price && parseFloat(b.price) > 0).map((bid, i) => (
+                {bids.map((bid, i) => (
                   <div key={i} style={{
                     display: "flex", alignItems: "center", gap: "6px",
                     padding: "4px 6px", borderRadius: "4px",
@@ -308,8 +309,10 @@ function JobCard({ job }: { job: JobState }) {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div style={{ fontSize: "11px", color: "var(--text-dim)" }}>No bids yet.</div>
+            )}
+          </div>
 
           {/* Deliverable */}
           {job.deliverable && (
@@ -365,10 +368,17 @@ export default function LiveDashboard() {
   const feedRef = useRef<HTMLDivElement>(null);
   const JOBS_PER_PAGE = 8;
 
-  // Only show jobs that have a real description and escrow amount (filter out corrupted/legacy jobs)
-  const hasValidData = (j: JobState) => j.description && j.description.trim() !== "" && j.escrow && parseFloat(j.escrow) > 0;
-  const activeJobs = jobs.filter(j => (j.status === "open" || j.status === "assigned" || j.status === "delivered") && hasValidData(j));
-  const closedJobs = jobs.filter(j => (j.status === "complete" || j.status === "failed") && hasValidData(j));
+  // Active jobs: need description + escrow so agents know what to bid on
+  const activeJobs = jobs.filter(j =>
+    (j.status === "open" || j.status === "assigned" || j.status === "delivered") &&
+    j.description && j.description.trim() !== "" &&
+    j.escrow && parseFloat(j.escrow) > 0
+  );
+  // Closed jobs: show if they have a deliverable (real work product) OR a description
+  const closedJobs = jobs.filter(j =>
+    (j.status === "complete" || j.status === "failed") &&
+    (j.deliverable || (j.description && j.description.trim() !== ""))
+  );
 
   const filteredActivities = selectedAgent
     ? activities.filter(a => a.agent === selectedAgent || a.to === selectedAgent)
