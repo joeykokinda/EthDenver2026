@@ -5,6 +5,93 @@ import Link from "next/link";
 import { ethers } from "ethers";
 import { Logo } from "../components/Logo";
 
+// ── ABI for calldata decoding ─────────────────────────────────────────────────
+const MARKETPLACE_IFACE = new ethers.Interface([
+  "function bidOnJob(uint256 jobId, uint256 price, bytes32 bidHash)",
+  "function postJob(bytes32 descriptionHash, uint256 escrowAmount)",
+  "function acceptBid(uint256 jobId, uint256 bidId)",
+  "function submitDelivery(uint256 jobId, bytes32 deliverableHash)",
+  "function finalizeJob(uint256 jobId, bool success, uint8 rating, bytes32 evidenceHash)",
+  "function rateClient(uint256 jobId, uint8 rating)",
+  "function finalizeAfterDeadline(uint256 jobId)",
+  "function cancelJob(uint256 jobId)",
+]);
+const IDENTITY_IFACE = new ethers.Interface([
+  "function registerVerified(string name, string description, string[] capabilities, bytes registrySignature)",
+  "function register(string name, string description, string[] capabilities)",
+  "function unregister()",
+  "function reactivate()",
+  "function reportAgent(address badActor, string reason)",
+]);
+const CONTENT_IFACE = new ethers.Interface([
+  "function publish(uint256 jobId, bytes32 contentHash, string contentType, string content, string agentName)",
+]);
+
+function decodeCalldata(input: string): { fn: string; args: Record<string, string> } | null {
+  if (!input || input === "0x") return null;
+  for (const iface of [MARKETPLACE_IFACE, IDENTITY_IFACE, CONTENT_IFACE]) {
+    try {
+      const decoded = iface.parseTransaction({ data: input });
+      if (!decoded) continue;
+      const args: Record<string, string> = {};
+      decoded.fragment.inputs.forEach((inp, i) => {
+        let val = decoded.args[i];
+        // Format tinybars → HBAR for price/escrow fields
+        if ((inp.name === "price" || inp.name === "escrowAmount") && typeof val === "bigint") {
+          args[inp.name] = `${ethers.formatUnits(val, 8)} HBAR`;
+        } else if (inp.name === "jobId" || inp.name === "bidId") {
+          args[inp.name] = `#${val.toString()}`;
+        } else if (inp.name === "rating") {
+          args[inp.name] = `${val.toString()}/100`;
+        } else if (inp.type === "bytes32") {
+          args[inp.name] = String(val).slice(0, 18) + "...";
+        } else if (inp.type === "bytes") {
+          args[inp.name] = String(val).slice(0, 18) + "...";
+        } else {
+          args[inp.name] = String(val);
+        }
+      });
+      return { fn: decoded.name, args };
+    } catch { /* try next */ }
+  }
+  return null;
+}
+
+interface DecodedTx {
+  status: "loading" | "ok" | "err";
+  fn?: string;
+  args?: Record<string, string>;
+  from?: string;
+  to?: string;
+  hashScanUrl?: string;
+  error?: string;
+}
+
+async function lookupTx(hash: string): Promise<DecodedTx> {
+  try {
+    const res = await fetch(
+      `https://testnet.mirrornode.hedera.com/api/v1/contracts/results/${hash}`
+    );
+    if (!res.ok) return { status: "err", error: `Mirror node returned ${res.status}` };
+    const data = await res.json();
+    const input = data.function_parameters || "0x";
+    const decoded = decodeCalldata(input);
+    const hashScanUrl = data.timestamp
+      ? `https://hashscan.io/testnet/transaction/${data.timestamp}`
+      : undefined;
+    return {
+      status: "ok",
+      fn: decoded?.fn,
+      args: decoded?.args,
+      from: data.from,
+      to: data.to,
+      hashScanUrl,
+    };
+  } catch (e: any) {
+    return { status: "err", error: e.message };
+  }
+}
+
 interface ChainEvent {
   type: string;
   txHash: string;
@@ -123,6 +210,16 @@ export default function ScannerPage() {
   const [filter, setFilter] = useState("all");
   const [lastBlock, setLastBlock] = useState(0);
   const [agentNames, setAgentNames] = useState<Record<string, string>>({});
+  const [txInput, setTxInput] = useState("");
+  const [decodedTx, setDecodedTx] = useState<DecodedTx | null>(null);
+
+  const handleDecode = async () => {
+    const hash = txInput.trim();
+    if (!hash) return;
+    setDecodedTx({ status: "loading" });
+    const result = await lookupTx(hash);
+    setDecodedTx(result);
+  };
 
   useEffect(() => {
     fetchEvents();
@@ -309,6 +406,81 @@ export default function ScannerPage() {
                 </a>
               )}
             </div>
+          </div>
+
+          {/* ── Tx Decoder ── */}
+          <div className="card" style={{ padding: "16px 20px", marginBottom: "20px", border: "1px solid var(--accent)33" }}>
+            <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px" }}>
+              Decode Transaction
+            </div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <input
+                value={txInput}
+                onChange={e => setTxInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleDecode()}
+                placeholder="Paste any tx hash from HashScan  e.g. 0x0c17459e..."
+                style={{
+                  flex: 1, padding: "8px 12px", borderRadius: "6px",
+                  border: "1px solid var(--border)", background: "var(--bg-secondary)",
+                  color: "var(--text-primary)", fontSize: "12px", fontFamily: "monospace",
+                  outline: "none",
+                }}
+              />
+              <button onClick={handleDecode} style={{
+                padding: "8px 16px", borderRadius: "6px", border: "none",
+                background: "var(--accent)", color: "#000", fontWeight: "700",
+                fontSize: "12px", cursor: "pointer",
+              }}>
+                Decode
+              </button>
+            </div>
+
+            {decodedTx && (
+              <div style={{ marginTop: "12px", padding: "12px", borderRadius: "6px", background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
+                {decodedTx.status === "loading" && (
+                  <span style={{ color: "var(--text-dim)", fontSize: "12px" }}>Fetching from Hedera mirror node...</span>
+                )}
+                {decodedTx.status === "err" && (
+                  <span style={{ color: "#f87171", fontSize: "12px" }}>{decodedTx.error}</span>
+                )}
+                {decodedTx.status === "ok" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{
+                        fontSize: "11px", fontWeight: "700", padding: "2px 8px",
+                        background: "var(--accent)22", color: "var(--accent)",
+                        borderRadius: "3px", fontFamily: "monospace",
+                      }}>
+                        {decodedTx.fn ?? "unknown function"}()
+                      </span>
+                      {decodedTx.hashScanUrl && (
+                        <a href={decodedTx.hashScanUrl} target="_blank" rel="noopener"
+                          style={{ fontSize: "10px", color: "var(--accent)" }}>
+                          view on HashScan ↗
+                        </a>
+                      )}
+                    </div>
+                    {decodedTx.args && Object.entries(decodedTx.args).map(([k, v]) => (
+                      <div key={k} style={{ fontSize: "12px", display: "flex", gap: "8px" }}>
+                        <span style={{ color: "var(--text-dim)", minWidth: "120px" }}>{k}</span>
+                        <span style={{ fontFamily: "monospace", color: "var(--text-primary)", fontWeight: "500" }}>{v}</span>
+                      </div>
+                    ))}
+                    {!decodedTx.fn && (
+                      <span style={{ fontSize: "12px", color: "var(--text-dim)" }}>
+                        Calldata not recognized — may be a contract call not in our ABI
+                      </span>
+                    )}
+                    {(decodedTx.from || decodedTx.to) && (
+                      <div style={{ fontSize: "10px", color: "var(--text-dim)", marginTop: "4px", fontFamily: "monospace" }}>
+                        {decodedTx.from && <span>from: {decodedTx.from} </span>}
+                        {decodedTx.to && <span>· to: {decodedTx.to}</span>}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Stats row */}
