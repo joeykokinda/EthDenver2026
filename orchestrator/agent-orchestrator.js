@@ -45,7 +45,9 @@ class AgentOrchestrator {
     this.tickRunning = false;
 
     // Track job descriptions so workers know what to deliver (on-chain only stores hash)
-    this.jobDescriptions = new Map(); // jobId → { description, type: "market_analysis"|"data_report" }
+    this.jobDescriptions = new Map(); // jobId → { description, type, poster }
+    this._jobDescPersistPath = path.join(__dirname, "../logs/job-descriptions.json");
+    this._loadPersistedJobDescriptions();
 
     // Persist activity feed across restarts
     this._feedPersistPath = path.join(__dirname, "../logs/activity-feed.json");
@@ -476,13 +478,36 @@ RESPOND WITH VALID JSON ONLY:
   }
 
   /**
-   * Save activity feed and job events to disk (called after each tick)
+   * Load persisted job descriptions from disk
+   */
+  _loadPersistedJobDescriptions() {
+    try {
+      if (fs.existsSync(this._jobDescPersistPath)) {
+        const saved = JSON.parse(fs.readFileSync(this._jobDescPersistPath, "utf-8"));
+        for (const [id, desc] of Object.entries(saved)) {
+          this.jobDescriptions.set(id, desc);
+        }
+        console.log(`Loaded ${this.jobDescriptions.size} job descriptions from persistence`);
+      }
+    } catch (e) {
+      console.log("Could not load persisted job descriptions (starting fresh)");
+    }
+  }
+
+  /**
+   * Save activity feed, job events, and job descriptions to disk (called after each tick)
    */
   _persistFeed() {
     try {
       fs.mkdirSync(path.dirname(this._feedPersistPath), { recursive: true });
       fs.writeFileSync(this._feedPersistPath, JSON.stringify(this.activityFeed.slice(0, this.maxFeedSize)));
       fs.writeFileSync(this._jobEventsPersistPath, JSON.stringify(this.jobEvents));
+      // Persist job descriptions (object form)
+      const descObj = {};
+      for (const [id, desc] of this.jobDescriptions.entries()) {
+        descObj[id] = desc;
+      }
+      fs.writeFileSync(this._jobDescPersistPath, JSON.stringify(descObj));
     } catch (e) {
       // non-fatal
     }
@@ -511,6 +536,81 @@ RESPOND WITH VALID JSON ONLY:
    */
   getAgentStats() {
     return this.lastSnapshot?.agents || [];
+  }
+
+  /**
+   * Get jobs board data — reconstructed from jobEvents + jobDescriptions.
+   * More reliable than deriving from the activity feed (which drops old events).
+   */
+  getJobsBoard() {
+    const jobs = {};
+
+    // Build from jobEvents (action events that are never evicted)
+    const sorted = [...this.jobEvents].reverse(); // oldest first
+    for (const a of sorted) {
+      if (a.type !== "action" && a.type !== "delivery" && a.type !== "client_rating") continue;
+      const id = a.jobId;
+      if (!id) continue;
+
+      if (a.type === "action") {
+        if (a.action === "post_job" && !jobs[id]) {
+          jobs[id] = {
+            jobId: id, poster: a.agent,
+            description: a.description || this.jobDescriptions.get(String(id))?.description || "",
+            escrow: a.price || "",
+            status: "open", bids: [], postedAt: a.timestamp,
+            posterTxHash: a.txHash, posterTxLink: a.txLink,
+          };
+        }
+        // Stub for jobs where post_job was evicted
+        if (!jobs[id] && a.action !== "post_job") {
+          const poster = (a.action === "accept_bid" || a.action === "finalize_job") ? a.agent : "";
+          jobs[id] = {
+            jobId: id, poster,
+            description: this.jobDescriptions.get(String(id))?.description || "",
+            escrow: a.price || "",
+            status: "open", bids: [], postedAt: a.timestamp,
+          };
+        }
+        // Fill description from jobDescriptions if missing
+        if (jobs[id] && !jobs[id].description) {
+          jobs[id].description = this.jobDescriptions.get(String(id))?.description || "";
+        }
+        if (a.action === "bid" && jobs[id]) {
+          const alreadyBid = jobs[id].bids.some(b => b.agent === a.agent);
+          if (!alreadyBid) jobs[id].bids.push({ agent: a.agent, price: a.price || "", txHash: a.txHash, txLink: a.txLink });
+        }
+        if (a.action === "accept_bid" && jobs[id]) {
+          jobs[id].status = "assigned"; jobs[id].winner = a.worker || a.agent;
+        }
+        if (a.action === "submit_delivery" && jobs[id]) {
+          jobs[id].status = "delivered";
+        }
+        if (a.action === "finalize_job" && jobs[id]) {
+          jobs[id].status = a.success ? "complete" : "failed";
+          jobs[id].rating = a.rating; jobs[id].payment = a.payment;
+          jobs[id].finalTxHash = a.txHash; jobs[id].finalTxLink = a.txLink;
+          if (!jobs[id].winner && a.worker) jobs[id].winner = a.worker;
+        }
+      }
+      if (a.type === "delivery" && jobs[id]) {
+        jobs[id].deliverable = a.content;
+      }
+    }
+
+    // Also scan activityFeed for jobs/deliveries not yet in jobEvents
+    const feedSorted = [...this.activityFeed].reverse();
+    for (const a of feedSorted) {
+      if (a.type === "delivery" && a.jobId && jobs[a.jobId]) {
+        if (!jobs[a.jobId].deliverable) jobs[a.jobId].deliverable = a.content;
+      }
+    }
+
+    const statusOrder = { open: 0, assigned: 1, delivered: 2, complete: 3, failed: 3 };
+    return Object.values(jobs).sort((a, b) => {
+      const diff = (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4);
+      return diff !== 0 ? diff : b.postedAt - a.postedAt;
+    });
   }
 
   /**

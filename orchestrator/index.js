@@ -60,6 +60,11 @@ app.get("/api/activity", (req, res) => {
   });
 });
 
+// Get jobs board — uses persistent jobEvents + jobDescriptions for reliable display
+app.get("/api/jobs-board", (req, res) => {
+  res.json({ jobs: orchestrator.getJobsBoard() });
+});
+
 // Get agent list — always queries chain live so rep + balance are never stale
 app.get("/api/agents", async (req, res) => {
   const provider = new ethers.JsonRpcProvider("https://testnet.hashio.io/api");

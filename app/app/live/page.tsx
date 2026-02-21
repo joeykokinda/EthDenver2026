@@ -352,6 +352,7 @@ function JobCard({ job }: { job: JobState }) {
 export default function LiveDashboard() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
+  const [jobs, setJobs] = useState<JobState[]>([]);
   const [personalities, setPersonalities] = useState<Record<string, string>>({});
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [simStatus, setSimStatus] = useState<SimStatus>({ running: false });
@@ -361,7 +362,6 @@ export default function LiveDashboard() {
   const [modalAgent, setModalAgent] = useState<string | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
 
-  const jobs = deriveJobs(activities);
   const activeJobs = jobs.filter(j => j.status === "open" || j.status === "assigned" || j.status === "delivered");
   const closedJobs = jobs.filter(j => j.status === "complete" || j.status === "failed");
 
@@ -376,18 +376,21 @@ export default function LiveDashboard() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [actRes, agentRes, statusRes] = await Promise.all([
+        const [actRes, agentRes, statusRes, jobsRes] = await Promise.all([
           fetch(`${ACTIVITY_API}/api/activity`),
           fetch(`${ACTIVITY_API}/api/agents`),
           fetch(`${ACTIVITY_API}/api/status`),
+          fetch(`${ACTIVITY_API}/api/jobs-board`),
         ]);
         const actData = await actRes.json();
         const agentData = await agentRes.json();
         const statusData = await statusRes.json();
+        const jobsData = await jobsRes.json();
 
         setActivities(actData.activities || []);
         setAgents(agentData.agents || []);
         setSimStatus(statusData);
+        setJobs(jobsData.jobs || []);
 
         const counts: Record<string, number> = {};
         for (const a of (actData.activities || [])) {
