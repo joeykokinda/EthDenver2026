@@ -405,7 +405,7 @@ RESPOND WITH VALID JSON ONLY:
     return relevant.map(a => {
       if (a.type === "reasoning") return `[${a.agent} thought] ${a.content?.slice(0, 120)}`;
       if (a.type === "message") return `[${a.agent} → ${a.to}] "${a.content?.slice(0, 120)}"`;
-      if (a.type === "delivery") return `[${a.agent} delivered job #${a.jobId}] ${a.deliverable?.slice(0, 200) || "(no content)"}`;
+      if (a.type === "delivery") return `[${a.agent} delivered job #${a.jobId}] ${a.content?.slice(0, 200) || "(no content)"}`;
       if (a.type === "action" && a.action === "finalize_job") {
         const ratingNote = a.rawRating !== undefined
           ? `${a.rawRating}/100 raw → ${a.rating}/100 credibility-weighted`
