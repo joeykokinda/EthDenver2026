@@ -328,6 +328,88 @@ app.post("/api/agent/sign", async (req, res) => {
   }
 });
 
+// ── Testnet Faucet ─────────────────────────────────────────────────────────
+// For OpenClaw agents and demo participants to get HBAR to cover gas.
+// Sends 2 HBAR per request, max once per address per hour, capped at 5 HBAR balance.
+//
+// POST /api/faucet
+// Body:    { address: "0x..." }
+// Returns: { txHash, amount, newBalance } | { error, alreadyFunded, balance }
+// ─────────────────────────────────────────────────────────────────────────────
+
+const faucetCooldowns = new Map(); // address → last funded timestamp
+const FAUCET_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+const FAUCET_AMOUNT_HBAR = "2";             // 2 HBAR per request
+const FAUCET_MAX_BALANCE = "5";             // don't fund if already has 5+ HBAR
+
+const faucetProvider = new ethers.JsonRpcProvider("https://testnet.hashio.io/api");
+const faucetWallet   = process.env.DEPLOYER_PRIVATE_KEY
+  ? new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, faucetProvider)
+  : null;
+
+app.post("/api/faucet", async (req, res) => {
+  if (!faucetWallet) {
+    return res.status(503).json({ error: "Faucet not configured on this server" });
+  }
+
+  const { address } = req.body;
+  if (!address || !ethers.isAddress(address)) {
+    return res.status(400).json({ error: "Invalid or missing address" });
+  }
+
+  const key       = address.toLowerCase();
+  const lastFunded = faucetCooldowns.get(key) || 0;
+  const cooldownRemaining = FAUCET_COOLDOWN_MS - (Date.now() - lastFunded);
+
+  if (cooldownRemaining > 0) {
+    const mins = Math.ceil(cooldownRemaining / 60000);
+    return res.status(429).json({
+      error: `Already funded recently. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`,
+      retryAfterMs: cooldownRemaining
+    });
+  }
+
+  // Check current balance
+  let currentBalance;
+  try {
+    const raw = await faucetProvider.getBalance(address);
+    currentBalance = parseFloat(ethers.formatEther(raw));
+  } catch (e) {
+    return res.status(502).json({ error: "Failed to query balance: " + e.message });
+  }
+
+  if (currentBalance >= parseFloat(FAUCET_MAX_BALANCE)) {
+    return res.status(200).json({
+      alreadyFunded: true,
+      balance: currentBalance.toFixed(4) + " HBAR",
+      message: `Address already has ${currentBalance.toFixed(2)} HBAR — no funding needed.`
+    });
+  }
+
+  // Send HBAR
+  try {
+    const tx = await faucetWallet.sendTransaction({
+      to: address,
+      value: ethers.parseEther(FAUCET_AMOUNT_HBAR)
+    });
+    await tx.wait();
+    faucetCooldowns.set(key, Date.now());
+
+    const newRaw = await faucetProvider.getBalance(address);
+    const newBalance = parseFloat(ethers.formatEther(newRaw)).toFixed(4);
+
+    res.json({
+      success:    true,
+      txHash:     tx.hash,
+      amount:     FAUCET_AMOUNT_HBAR + " HBAR",
+      newBalance: newBalance + " HBAR",
+      message:    `Sent ${FAUCET_AMOUNT_HBAR} HBAR to ${address}`
+    });
+  } catch (e) {
+    res.status(500).json({ error: "Faucet transfer failed: " + e.message });
+  }
+});
+
 // Start server
 const PORT = process.env.ORCHESTRATOR_PORT || 3001;
 app.listen(PORT, () => {
@@ -337,7 +419,9 @@ app.listen(PORT, () => {
   console.log(`   GET  /api/status            - Simulation status`);
   console.log(`   POST /api/control/start     - Start simulation`);
   console.log(`   POST /api/control/stop      - Stop simulation`);
-  console.log(`   POST /api/agent/sign        - OpenClaw: get registry signature for your agent address`);
+  console.log(`   POST /api/agent/challenge   - OpenClaw: get challenge nonce`);
+  console.log(`   POST /api/agent/sign        - OpenClaw: get registry signature`);
+  console.log(`   POST /api/faucet            - OpenClaw: get 2 HBAR testnet gas`);
   console.log(`\nReady. Hit /api/control/start to begin.\n`);
 });
 

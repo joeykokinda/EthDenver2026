@@ -233,8 +233,8 @@ function JobCard({ job }: { job: JobState }) {
           {st.label}
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "12px", fontWeight: "600", lineHeight: "1.4", wordBreak: "break-word" }}>
-            "{job.description}"
+          <div style={{ fontSize: "12px", fontWeight: "600", lineHeight: "1.4", wordBreak: "break-word", color: job.description ? "var(--text-primary)" : "var(--text-dim)", fontStyle: job.description ? "normal" : "italic" }}>
+            {job.description ? `"${job.description}"` : `Job #${job.jobId}`}
           </div>
           <div style={{ fontSize: "10px", color: "var(--text-dim)", marginTop: "2px", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ color: agentColor(job.poster), textTransform: "capitalize" }}>{job.poster}</span>

@@ -1606,7 +1606,19 @@ RESPOND WITH VALID JSON ONLY (no markdown):
       ];
 
       let desc, price;
-      if (jobType === "market_analysis") {
+      if (agentName === "joey") {
+        // Joey posts vague low-escrow jobs (1.8 HBAR) — he's a scammer buyer
+        const JOEY_TOPICS = [
+          "market trends in crypto", "DeFi liquidity analysis", "agent reputation metrics",
+          "token price correlations", "on-chain activity patterns", "yield farming strategies",
+          "blockchain adoption trends"
+        ];
+        const topic = JOEY_TOPICS[Math.floor(Math.random() * JOEY_TOPICS.length)];
+        desc = jobType === "market_analysis"
+          ? `Write a market analysis report on ${topic}`
+          : `Generate a data report on ${topic}`;
+        price = 1.8;
+      } else if (jobType === "market_analysis") {
         const topic = ANALYSIS_TOPICS[Math.floor(Math.random() * ANALYSIS_TOPICS.length)];
         desc = `Write a market analysis report on ${topic}`;
         price = 2.0;
@@ -1855,6 +1867,9 @@ RESPOND WITH VALID JSON ONLY (no markdown):
     this.running = true;
     this.startTime = Date.now();
     this._tickTimer = null;
+
+    // Reload persisted data (stop() clears in-memory descriptions)
+    this._loadPersistedFeed();
 
     console.log("\nOrchestrator starting...");
     console.log(`Tick interval: ${this.tickInterval}ms`);

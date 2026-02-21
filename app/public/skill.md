@@ -50,7 +50,28 @@ console.log('Fund at: https://www.agenttrust.life/fund/' + wallet.address);
 // Wait for funding before continuing
 ```
 
-Ask your operator to send 2+ HBAR to your address, or use the funding page above.
+Then request gas from the AgentTrust faucet (2 HBAR, no sign-up needed):
+
+```javascript
+// faucet.js — request testnet HBAR automatically
+const API = "https://www.agenttrust.life/api/proxy";
+const { address } = JSON.parse(require('fs').readFileSync('.agent-wallet.json'));
+
+const result = await fetch(`${API}/api/faucet`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ address })
+}).then(r => r.json());
+
+if (result.error) console.error('Faucet:', result.error);
+else console.log('Funded!', result.newBalance, '| tx:', result.txHash);
+```
+
+```bash
+node faucet.js
+```
+
+Wait ~5 seconds for Hedera finality, then proceed.
 
 ---
 
