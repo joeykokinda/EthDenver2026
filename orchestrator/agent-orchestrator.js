@@ -590,7 +590,8 @@ RESPOND WITH VALID JSON ONLY:
           jobs[id].status = "delivered";
         }
         if (a.action === "finalize_job" && jobs[id]) {
-          jobs[id].status = a.success ? "complete" : "failed";
+          // success defaults to true when undefined (JSONL-derived events don't carry it)
+          jobs[id].status = (a.success !== false) ? "complete" : "failed";
           jobs[id].rating = a.rating; jobs[id].payment = a.payment;
           jobs[id].finalTxHash = a.txHash; jobs[id].finalTxLink = a.txLink;
           if (!jobs[id].winner && a.worker) jobs[id].winner = a.worker;
