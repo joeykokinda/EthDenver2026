@@ -360,7 +360,10 @@ export default function LiveDashboard() {
   const [actionLoading, setActionLoading] = useState(false);
   const [activityCounts, setActivityCounts] = useState<Record<string, number>>({});
   const [modalAgent, setModalAgent] = useState<string | null>(null);
+  const [jobTab, setJobTab] = useState<"active" | "closed">("active");
+  const [jobPage, setJobPage] = useState(0);
   const feedRef = useRef<HTMLDivElement>(null);
+  const JOBS_PER_PAGE = 8;
 
   const activeJobs = jobs.filter(j => j.status === "open" || j.status === "assigned" || j.status === "delivered");
   const closedJobs = jobs.filter(j => j.status === "complete" || j.status === "failed");
@@ -489,7 +492,7 @@ export default function LiveDashboard() {
             </span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "240px 320px 1fr", gap: "14px", alignItems: "start" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "240px 380px 1fr", gap: "14px", alignItems: "start" }}>
 
             {/* ── COL 1: Agent Roster ── */}
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -730,35 +733,91 @@ export default function LiveDashboard() {
             </div>
 
             {/* ── COL 2: Jobs Board ── */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <div style={{ fontSize: "10px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "2px", display: "flex", justifyContent: "space-between" }}>
-                <span>Jobs Board</span>
-                <span>{activeJobs.length} active · {closedJobs.length} closed</span>
-              </div>
+            {(() => {
+              const tabJobs = jobTab === "active" ? activeJobs : closedJobs;
+              const totalPages = Math.max(1, Math.ceil(tabJobs.length / JOBS_PER_PAGE));
+              const safePage = Math.min(jobPage, totalPages - 1);
+              const pageJobs = tabJobs.slice(safePage * JOBS_PER_PAGE, (safePage + 1) * JOBS_PER_PAGE);
 
-              {jobs.length === 0 ? (
-                <div style={{
-                  padding: "32px 16px", textAlign: "center", color: "var(--text-dim)",
-                  background: "var(--bg-secondary)", borderRadius: "8px",
-                  border: "1px solid var(--border)", fontSize: "12px"
-                }}>
-                  No jobs yet. Waiting for agents...
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "calc(100vh - 160px)", overflowY: "auto", paddingRight: "2px" }}>
-                  {activeJobs.map(job => <JobCard key={job.jobId} job={job} />)}
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {/* Header row: tabs + count */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0", borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>
+                    {(["active", "closed"] as const).map(tab => (
+                      <button key={tab} onClick={() => { setJobTab(tab); setJobPage(0); }} style={{
+                        padding: "4px 12px", fontSize: "11px", fontWeight: "600",
+                        background: "none", border: "none", cursor: "pointer",
+                        color: jobTab === tab ? "var(--accent)" : "var(--text-dim)",
+                        borderBottom: jobTab === tab ? "2px solid var(--accent)" : "2px solid transparent",
+                        marginBottom: "-9px", textTransform: "capitalize",
+                      }}>
+                        {tab} ({tab === "active" ? activeJobs.length : closedJobs.length})
+                      </button>
+                    ))}
+                    <span style={{ marginLeft: "auto", fontSize: "10px", color: "var(--text-dim)" }}>
+                      p.{safePage + 1}/{totalPages}
+                    </span>
+                  </div>
 
-                  {closedJobs.length > 0 && (
-                    <>
-                      <div style={{ fontSize: "9px", color: "var(--text-dim)", textAlign: "center", padding: "8px 0 4px", textTransform: "uppercase", letterSpacing: "0.5px", borderTop: "1px solid var(--border)", marginTop: "2px" }}>
-                        Closed ({closedJobs.length})
-                      </div>
-                      {closedJobs.map(job => <JobCard key={job.jobId} job={job} />)}
-                    </>
+                  {/* Job cards */}
+                  {jobs.length === 0 ? (
+                    <div style={{ padding: "32px 16px", textAlign: "center", color: "var(--text-dim)", background: "var(--bg-secondary)", borderRadius: "8px", border: "1px solid var(--border)", fontSize: "12px" }}>
+                      No jobs yet. Waiting for agents...
+                    </div>
+                  ) : pageJobs.length === 0 ? (
+                    <div style={{ padding: "24px 16px", textAlign: "center", color: "var(--text-dim)", fontSize: "12px" }}>
+                      No {jobTab} jobs.
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {pageJobs.map(job => <JobCard key={job.jobId} job={job} />)}
+                    </div>
+                  )}
+
+                  {/* Pagination controls */}
+                  {totalPages > 1 && (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", paddingTop: "4px" }}>
+                      <button onClick={() => setJobPage(0)} disabled={safePage === 0} style={{
+                        padding: "4px 8px", fontSize: "11px", borderRadius: "4px",
+                        border: "1px solid var(--border)", background: "var(--bg-secondary)",
+                        color: safePage === 0 ? "var(--text-dim)" : "var(--text-primary)",
+                        cursor: safePage === 0 ? "not-allowed" : "pointer", opacity: safePage === 0 ? 0.4 : 1,
+                      }}>«</button>
+                      <button onClick={() => setJobPage(p => Math.max(0, p - 1))} disabled={safePage === 0} style={{
+                        padding: "4px 8px", fontSize: "11px", borderRadius: "4px",
+                        border: "1px solid var(--border)", background: "var(--bg-secondary)",
+                        color: safePage === 0 ? "var(--text-dim)" : "var(--text-primary)",
+                        cursor: safePage === 0 ? "not-allowed" : "pointer", opacity: safePage === 0 ? 0.4 : 1,
+                      }}>‹ Prev</button>
+
+                      {/* Page number pills */}
+                      {Array.from({ length: totalPages }, (_, i) => i).filter(i => Math.abs(i - safePage) <= 2).map(i => (
+                        <button key={i} onClick={() => setJobPage(i)} style={{
+                          padding: "4px 8px", fontSize: "11px", borderRadius: "4px",
+                          border: i === safePage ? "1px solid var(--accent)" : "1px solid var(--border)",
+                          background: i === safePage ? "var(--accent)" : "var(--bg-secondary)",
+                          color: i === safePage ? "#000" : "var(--text-primary)",
+                          cursor: "pointer", fontWeight: i === safePage ? "700" : "400",
+                        }}>{i + 1}</button>
+                      ))}
+
+                      <button onClick={() => setJobPage(p => Math.min(totalPages - 1, p + 1))} disabled={safePage === totalPages - 1} style={{
+                        padding: "4px 8px", fontSize: "11px", borderRadius: "4px",
+                        border: "1px solid var(--border)", background: "var(--bg-secondary)",
+                        color: safePage === totalPages - 1 ? "var(--text-dim)" : "var(--text-primary)",
+                        cursor: safePage === totalPages - 1 ? "not-allowed" : "pointer", opacity: safePage === totalPages - 1 ? 0.4 : 1,
+                      }}>Next ›</button>
+                      <button onClick={() => setJobPage(totalPages - 1)} disabled={safePage === totalPages - 1} style={{
+                        padding: "4px 8px", fontSize: "11px", borderRadius: "4px",
+                        border: "1px solid var(--border)", background: "var(--bg-secondary)",
+                        color: safePage === totalPages - 1 ? "var(--text-dim)" : "var(--text-primary)",
+                        cursor: safePage === totalPages - 1 ? "not-allowed" : "pointer", opacity: safePage === totalPages - 1 ? 0.4 : 1,
+                      }}>»</button>
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* ── COL 3: Activity Feed ── */}
             <div className="card" style={{ padding: "0", overflow: "hidden" }}>
