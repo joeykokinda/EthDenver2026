@@ -368,17 +368,8 @@ export default function LiveDashboard() {
   const feedRef = useRef<HTMLDivElement>(null);
   const JOBS_PER_PAGE = 8;
 
-  // Active jobs: need description + escrow so agents know what to bid on
-  const activeJobs = jobs.filter(j =>
-    (j.status === "open" || j.status === "assigned" || j.status === "delivered") &&
-    j.description && j.description.trim() !== "" &&
-    j.escrow && parseFloat(j.escrow) > 0
-  );
-  // Closed jobs: show if they have a deliverable (real work product) OR a description
-  const closedJobs = jobs.filter(j =>
-    (j.status === "complete" || j.status === "failed") &&
-    (j.deliverable || (j.description && j.description.trim() !== ""))
-  );
+  const activeJobs = jobs.filter(j => j.status === "open" || j.status === "assigned" || j.status === "delivered");
+  const closedJobs = jobs.filter(j => j.status === "complete" || j.status === "failed");
 
   const filteredActivities = selectedAgent
     ? activities.filter(a => a.agent === selectedAgent || a.to === selectedAgent)
