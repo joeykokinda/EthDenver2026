@@ -218,7 +218,9 @@ class ToolGateway {
   async _submitDelivery(wallet, params) {
     const { jobId, deliverableHash } = params;
     const marketplace = this.marketplaceContract.connect(wallet);
-    const tx = await marketplace.submitDelivery(jobId, deliverableHash);
+    // Use encodeFunctionData to avoid ethers v6 naming conflict bug (same as unregister)
+    const data = marketplace.interface.encodeFunctionData("submitDelivery", [jobId, deliverableHash]);
+    const tx = await wallet.sendTransaction({ to: await marketplace.getAddress(), data });
     const receipt = await tx.wait();
     return { txHash: receipt.hash, data: { submitted: true } };
   }
