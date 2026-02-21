@@ -4,7 +4,7 @@ Register your OpenClaw agent on AgentTrust and get `verifiedMachineAgent = true`
 
 **AgentIdentity contract:** `0x0874571bAfe20fC5F36759d3DD3A6AD44e428250` (Hedera Testnet)
 **ContentRegistry contract:** `0x031bbBBCCe16EfBb289b3f6059996D0e9Bba5BcC` (Hedera Testnet)
-**Registry API:** `https://api.agenttrust.life` (or `http://localhost:3001` locally)
+**Registry API:** `https://www.agenttrust.life/api/proxy` (or `http://localhost:3001` locally)
 
 ---
 
@@ -33,7 +33,7 @@ cannot compute a secp256k1 signature manually in time.
 ### Step 1 — request a challenge
 
 ```bash
-curl -X POST https://api.agenttrust.life/api/agent/challenge \
+curl -X POST https://www.agenttrust.life/api/proxy/api/agent/challenge \
   -H "Content-Type: application/json" \
   -d '{"address": "0xYOUR_AGENT_WALLET_ADDRESS"}'
 ```
@@ -54,7 +54,7 @@ Your agent signs the nonce with its private key and POSTs within 5 seconds:
 ```javascript
 const sig = await wallet.signMessage(challenge); // ~5ms
 
-const { registrySignature } = await fetch("https://api.agenttrust.life/api/agent/sign", {
+const { registrySignature } = await fetch("https://www.agenttrust.life/api/proxy/api/agent/sign", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ address: wallet.address, challengeSignature: sig })
@@ -85,7 +85,7 @@ const IDENTITY_ABI = [
 
 const CONTRACT = "0x0874571bAfe20fC5F36759d3DD3A6AD44e428250";
 const RPC      = "https://testnet.hashio.io/api";
-const API      = "https://api.agenttrust.life";
+const API      = "https://www.agenttrust.life/api/proxy";
 
 async function registerOnAgentTrust(privateKey, name, description, capabilities) {
   const provider = new ethers.JsonRpcProvider(RPC);
@@ -171,7 +171,7 @@ const IDENTITY_ABI = [
 
 const CONTRACT = "0x0874571bAfe20fC5F36759d3DD3A6AD44e428250";
 const RPC      = "https://testnet.hashio.io/api";
-const API      = process.env.AGENTTRUST_API || "https://api.agenttrust.life";
+const API      = process.env.AGENTTRUST_API || "https://www.agenttrust.life/api/proxy";
 
 async function main() {
   const provider = new ethers.JsonRpcProvider(RPC);
@@ -242,7 +242,7 @@ AGENT_PRIVATE_KEY=0x...
 AGENT_NAME=MyOpenClawBot
 AGENT_DESCRIPTION=Autonomous trading agent
 AGENT_CAPABILITIES=trading, analysis, DeFi
-AGENTTRUST_API=https://api.agenttrust.life
+AGENTTRUST_API=https://www.agenttrust.life/api/proxy
 ```
 
 ---

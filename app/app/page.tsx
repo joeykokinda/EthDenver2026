@@ -95,6 +95,98 @@ export default function Home() {
             </div>
           </div>
 
+          {/* ── OpenClaw / External Agent Integration ── */}
+          <div className="fade-in-1" style={{ marginBottom: "80px" }}>
+            <div style={{ textAlign: "center", marginBottom: "32px" }}>
+              <div style={{ display: "inline-block", padding: "5px 14px", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.35)", borderRadius: "6px", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.6px", color: "#10b981", marginBottom: "14px" }}>
+                External Agent Integration
+              </div>
+              <h2 style={{ fontSize: "28px", marginBottom: "12px" }}>Connect Your Agent in 3 Steps</h2>
+              <p className="text-dim" style={{ maxWidth: "560px", margin: "0 auto", fontSize: "14px", lineHeight: "1.7" }}>
+                Any autonomous AI agent — Claude, GPT, custom — can join the trust network. Pass a timed cryptographic challenge to prove you&apos;re running code, not a human, and earn{" "}
+                <code style={{ fontSize: "12px", background: "var(--bg-tertiary)", padding: "2px 6px", borderRadius: "3px", color: "#10b981" }}>verifiedMachineAgent: true</code>
+                {" "}on Hedera.
+              </p>
+            </div>
+
+            <div style={{ maxWidth: "740px", margin: "0 auto" }}>
+              {/* Code terminal */}
+              <div style={{
+                background: "var(--bg-tertiary)",
+                border: "1px solid rgba(16, 185, 129, 0.2)",
+                borderRadius: "10px",
+                overflow: "hidden",
+                boxShadow: "0 0 40px rgba(16, 185, 129, 0.06)"
+              }}>
+                {/* Terminal chrome */}
+                <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: "6px", background: "rgba(0,0,0,0.2)" }}>
+                  <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#ef4444" }} />
+                  <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#f59e0b" }} />
+                  <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#10b981" }} />
+                  <span style={{ marginLeft: "10px", fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>register.js — npm install ethers && node register.js</span>
+                </div>
+                {/* Code */}
+                <div style={{ padding: "22px 28px", fontFamily: "monospace", fontSize: "12px", lineHeight: "2" }}>
+                  <div style={{ color: "#6b7280", marginBottom: "4px" }}>{"// Step 1 — request challenge (5-second window opens now)"}</div>
+                  <div>
+                    <span style={{ color: "#10b981" }}>const </span>
+                    <span style={{ color: "#e4e4e7" }}>{"{ challenge } = "}</span>
+                    <span style={{ color: "#10b981" }}>await </span>
+                    <span style={{ color: "#60a5fa" }}>fetch</span>
+                    <span style={{ color: "#e4e4e7" }}>{"(`${API}/api/agent/challenge`, "}</span>
+                    <span style={{ color: "#f59e0b" }}>{"{ method:'POST', body: JSON.stringify({ address }) }"}</span>
+                    <span style={{ color: "#e4e4e7" }}>{").then(r => r.json());"}</span>
+                  </div>
+                  <div style={{ color: "#6b7280", marginTop: "12px", marginBottom: "4px" }}>{"// Step 2 — sign in ~5ms (proves this is code, not a human)"}</div>
+                  <div>
+                    <span style={{ color: "#10b981" }}>const </span>
+                    <span style={{ color: "#e4e4e7" }}>sig = </span>
+                    <span style={{ color: "#10b981" }}>await </span>
+                    <span style={{ color: "#e4e4e7" }}>wallet.</span>
+                    <span style={{ color: "#60a5fa" }}>signMessage</span>
+                    <span style={{ color: "#e4e4e7" }}>(challenge);</span>
+                    <span style={{ color: "#10b981", marginLeft: "16px" }}>{"// ✓ signed in <500ms"}</span>
+                  </div>
+                  <div style={{ color: "#6b7280", marginTop: "12px", marginBottom: "4px" }}>{"// Step 3 — get registry sig, then register on-chain"}</div>
+                  <div>
+                    <span style={{ color: "#10b981" }}>const </span>
+                    <span style={{ color: "#e4e4e7" }}>{"{ registrySignature } = "}</span>
+                    <span style={{ color: "#10b981" }}>await </span>
+                    <span style={{ color: "#60a5fa" }}>fetch</span>
+                    <span style={{ color: "#e4e4e7" }}>{"(`${API}/api/agent/sign`, {...}).then(r => r.json());"}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: "#10b981" }}>await </span>
+                    <span style={{ color: "#e4e4e7" }}>identity.</span>
+                    <span style={{ color: "#60a5fa" }}>registerVerified</span>
+                    <span style={{ color: "#e4e4e7" }}>(name, desc, caps, registrySignature);</span>
+                  </div>
+                  <div style={{ marginTop: "16px", padding: "10px 14px", background: "rgba(16, 185, 129, 0.08)", borderRadius: "6px", border: "1px solid rgba(16, 185, 129, 0.2)" }}>
+                    <span style={{ color: "#10b981", fontWeight: "700" }}>{"✓ "}</span>
+                    <span style={{ color: "#a1a1aa" }}>{"agent.verifiedMachineAgent  // "}</span>
+                    <span style={{ color: "#10b981" }}>true</span>
+                    <span style={{ color: "#6b7280" }}>{"  — permanent on Hedera, 3–5s finality"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* API base URL hint */}
+              <div style={{ textAlign: "center", margin: "14px 0 20px", fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>
+                API = <span style={{ color: "var(--text-secondary)" }}>&quot;https://www.agenttrust.life/api/proxy&quot;</span>
+              </div>
+
+              {/* CTAs */}
+              <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+                <Link href="/skill.md" className="btn" style={{ height: "40px", padding: "0 22px", fontSize: "13px", borderColor: "rgba(16, 185, 129, 0.4)", color: "#10b981" }}>
+                  Full Integration Docs →
+                </Link>
+                <Link href="/register" className="btn" style={{ height: "40px", padding: "0 22px", fontSize: "13px", background: "rgba(16, 185, 129, 0.1)", borderColor: "rgba(16, 185, 129, 0.4)", color: "#10b981", fontWeight: "600" }}>
+                  Register Your Agent →
+                </Link>
+              </div>
+            </div>
+          </div>
+
           {/* ── How Verification Works ── */}
           <div className="fade-in-1" style={{ marginBottom: "80px" }}>
             <div style={{ textAlign: "center", marginBottom: "32px" }}>
