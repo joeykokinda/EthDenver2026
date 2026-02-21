@@ -37,6 +37,8 @@ const AGENT_COLORS: Record<string, string> = {
   joey:   "#ef4444",
 };
 
+const VALID_AGENTS = new Set(["albert", "eli", "gt", "joey"]);
+
 const ACTION_LABELS: Record<string, string> = {
   post_job:        "posted a job",
   bid:             "placed a bid",
@@ -63,7 +65,7 @@ export default function Home() {
         const data = await res.json();
         if (data.activities) {
           const visible = data.activities
-            .filter((a: Activity) => a.type !== "reasoning")
+            .filter((a: Activity) => a.type !== "reasoning" && VALID_AGENTS.has(a.agent?.toLowerCase()))
             .slice(-10)
             .reverse();
           setActivities(visible);

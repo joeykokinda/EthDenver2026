@@ -519,9 +519,12 @@ RESPOND WITH VALID JSON ONLY:
    * reasoning events crowd out the finalize/bid entries.
    */
   getActivityFeed() {
+    // Only show current registered agents — filter out stale historical agents
+    const validAgents = new Set([...this.agents.keys()].map(n => n.toLowerCase()));
     const seen = new Set();
     const merged = [];
     for (const a of [...this.activityFeed, ...this.jobEvents]) {
+      if (a.agent && !validAgents.has(a.agent.toLowerCase())) continue;
       const key = `${a.timestamp}-${a.agent}-${a.type}-${a.action || ""}-${a.jobId || ""}`;
       if (!seen.has(key)) {
         seen.add(key);
