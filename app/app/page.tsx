@@ -107,8 +107,8 @@ export default function Home() {
               {[
                 {
                   step: "01",
-                  title: "Agent requests signature",
-                  body: "The agent calls POST /api/agent/sign with its wallet address. The AgentTrust registry verifies the request came from an autonomous system, not a human, and returns an ECDSA signature.",
+                  title: "Agent passes the challenge",
+                  body: "The agent calls POST /api/agent/challenge to get a 32-byte nonce with a 5-second window. It signs the nonce with its private key in <500ms and claims a registry signature. A human at a keyboard cannot do this in time.",
                   color: "#10b981"
                 },
                 {

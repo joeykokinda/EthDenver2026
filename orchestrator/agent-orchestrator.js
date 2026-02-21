@@ -40,12 +40,12 @@ class AgentOrchestrator {
     this.tickRunning = false;
 
     // Track job descriptions so workers know what to deliver (on-chain only stores hash)
-    this.jobDescriptions = new Map(); // jobId → { description, type: "poem"|"art" }
+    this.jobDescriptions = new Map(); // jobId → { description, type: "market_analysis"|"data_report" }
 
     // Persist activity feed across restarts
     this._feedPersistPath = path.join(__dirname, "../logs/activity-feed.json");
     this._loadPersistedFeed();
-    this.lastJobType = "art"; // alternate: next will be "poem"
+    this.lastJobType = "data_report"; // alternate: next will be "market_analysis"
 
     // Track how many ticks each job has been "waiting" without bid acceptance — force after 3
     this.jobWaitCounts = new Map(); // jobId → wait count
@@ -664,7 +664,7 @@ REPUTATION GUIDE: Scores start at 500 (neutral). Above 600 = trustworthy. Below 
 
 Decide whether to accept a bid NOW or wait. Be decisive — waiting too long means the job never gets done.
 IMPORTANT: Reject bids from warned agents (reportCount >= 2) unless no other options exist.
-CRITICAL: Match the job to the right specialist. If the job is "${jobDescription}" (type: ${jobType}), prefer the bidder whose bidderCapabilities best match that work — an ASCII artist for art jobs, a poet for poetry. A perfect specialist at rep 500 beats a generalist at rep 800 for specialty work.
+CRITICAL: Match the job to the right specialist. If the job is "${jobDescription}" (type: ${jobType}), prefer the bidder whose bidderCapabilities best match that work — an analyst for market_analysis jobs, a data specialist for data_report jobs. A perfect specialist at rep 500 beats a generalist at rep 800 for specialty work.
 
 In your reasoning, reference specific on-chain data — the bidder's rep score, their completed jobs, their bid price vs others, and their capabilities. Make it feel like you're reading actual blockchain state.
 
@@ -1435,28 +1435,32 @@ RESPOND WITH VALID JSON ONLY (no markdown):
     try {
       const agent = this.agents.get(agentName);
 
-      // Alternate between poem and art jobs for a clear demo narrative
-      this.lastJobType = this.lastJobType === "poem" ? "art" : "poem";
+      // Alternate between market analysis and data report jobs
+      this.lastJobType = this.lastJobType === "market_analysis" ? "data_report" : "market_analysis";
       const jobType = this.lastJobType;
 
-      const POEM_TOPICS = [
-        "blockchain trust", "artificial intelligence", "the future",
-        "machine learning", "decentralized worlds", "time and memory",
-        "digital dreams", "network connections", "the age of robots"
+      const ANALYSIS_TOPICS = [
+        "blockchain trust infrastructure", "AI agent coordination",
+        "decentralized reputation systems", "autonomous agent economies",
+        "on-chain identity verification", "machine learning governance",
+        "tokenized incentive design", "agent-to-agent payment protocols",
+        "trustless escrow mechanisms"
       ];
-      const ART_SUBJECTS = [
-        "a cat", "a robot", "a rocket ship", "a tree",
-        "a clock", "a moon", "a dragon", "a house", "a brain"
+      const REPORT_SUBJECTS = [
+        "agent reputation distribution", "market liquidity dynamics",
+        "transaction throughput patterns", "escrow settlement rates",
+        "reputation score decay curves", "agent network topology",
+        "bid/ask spread analysis", "job completion rates", "trust score correlations"
       ];
 
       let desc, price;
-      if (jobType === "poem") {
-        const topic = POEM_TOPICS[Math.floor(Math.random() * POEM_TOPICS.length)];
-        desc = `Write a poem about ${topic}`;
+      if (jobType === "market_analysis") {
+        const topic = ANALYSIS_TOPICS[Math.floor(Math.random() * ANALYSIS_TOPICS.length)];
+        desc = `Write a market analysis report on ${topic}`;
         price = 2.0;
       } else {
-        const subject = ART_SUBJECTS[Math.floor(Math.random() * ART_SUBJECTS.length)];
-        desc = `Create ASCII art of ${subject}`;
+        const subject = REPORT_SUBJECTS[Math.floor(Math.random() * REPORT_SUBJECTS.length)];
+        desc = `Generate a structured data report on ${subject}`;
         price = 2.2;
       }
 
@@ -1739,7 +1743,7 @@ RESPOND WITH VALID JSON ONLY (no markdown):
     this.lastSnapshot = null;
     this.tickRunning = false;
     this.jobDescriptions.clear();
-    this.lastJobType = "art";
+    this.lastJobType = "data_report";
     console.log("\nOrchestrator stopped");
     // Note: agents stay registered on-chain so the marketplace can always track reputation
   }

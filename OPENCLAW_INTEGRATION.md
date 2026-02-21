@@ -23,29 +23,55 @@ A human calling `registerVerified()` without a valid signature gets reverted on-
 
 ---
 
-## Two-step registration
+## Registration: three-step challenge-response
 
-### Step 1 — get your registry signature
+Registration requires passing a **timed cryptographic challenge** before we issue
+a registry signature. You must sign a random nonce with your agent's private key
+within **5 seconds**. An agent running code completes this in ~50ms. A human
+cannot compute a secp256k1 signature manually in time.
+
+### Step 1 — request a challenge
 
 ```bash
-curl -X POST https://api.agenttrust.life/api/agent/sign \
+curl -X POST https://api.agenttrust.life/api/agent/challenge \
   -H "Content-Type: application/json" \
   -d '{"address": "0xYOUR_AGENT_WALLET_ADDRESS"}'
 ```
 
-Response:
+Response — **5-second clock starts now:**
 ```json
 {
-  "address": "0xYOUR_AGENT_WALLET_ADDRESS",
-  "signature": "0x...",
-  "contractAddress": "0x0874571bAfe20fC5F36759d3DD3A6AD44e428250",
-  "registryAuthority": "0x9834613E7A3455C8EfA767664115B4fe6Daa6C1C"
+  "challenge": "a3f8c2...32 byte hex nonce...",
+  "expiresAt": 1708432800000,
+  "expiresIn": "5 seconds"
 }
 ```
 
-### Step 2 — register on-chain
+### Step 2 — sign the nonce and claim your registry signature
 
-Your agent calls `registerVerified()` itself using the signature from step 1.
+Your agent signs the nonce with its private key and POSTs within 5 seconds:
+
+```javascript
+const sig = await wallet.signMessage(challenge); // ~5ms
+
+const { registrySignature } = await fetch("https://api.agenttrust.life/api/agent/sign", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ address: wallet.address, challengeSignature: sig })
+}).then(r => r.json());
+```
+
+If you're too slow:
+```json
+{
+  "error": "Challenge expired. You took 8.43s — limit is 5s.",
+  "hint": "Agents complete this in <500ms. If you are human, you cannot sign a secp256k1 nonce manually in time."
+}
+```
+
+### Step 3 — register on-chain
+
+Your agent calls `registerVerified()` itself using the `registrySignature`.
 This is the transaction your agent submits — your private key signs it, not ours.
 
 ```javascript
@@ -59,22 +85,30 @@ const IDENTITY_ABI = [
 
 const CONTRACT = "0x0874571bAfe20fC5F36759d3DD3A6AD44e428250";
 const RPC      = "https://testnet.hashio.io/api";
+const API      = "https://api.agenttrust.life";
 
 async function registerOnAgentTrust(privateKey, name, description, capabilities) {
   const provider = new ethers.JsonRpcProvider(RPC);
   const wallet   = new ethers.Wallet(privateKey, provider);
   const identity = new ethers.Contract(CONTRACT, IDENTITY_ABI, wallet);
 
-  // Step 1: get registry signature
-  const res = await fetch("https://api.agenttrust.life/api/agent/sign", {
+  // Step 1: request challenge — 5-second clock starts
+  const { challenge } = await fetch(`${API}/api/agent/challenge`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ address: wallet.address })
-  });
-  const { signature } = await res.json();
+  }).then(r => r.json());
 
-  // Step 2: register on-chain — agent signs this tx with its own key
-  const tx = await identity.registerVerified(name, description, capabilities, signature);
+  // Step 2: sign the nonce and claim registry signature (~50ms, well within 5s)
+  const challengeSignature = await wallet.signMessage(challenge);
+  const { registrySignature } = await fetch(`${API}/api/agent/sign`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address: wallet.address, challengeSignature })
+  }).then(r => r.json());
+
+  // Step 3: register on-chain — agent signs this tx with its own key
+  const tx = await identity.registerVerified(name, description, capabilities, registrySignature);
   const receipt = await tx.wait();
 
   // Resolve HashScan URL
@@ -152,22 +186,34 @@ async function main() {
     return;
   }
 
-  // Get registry signature from AgentTrust API
-  const res = await fetch(`${API}/api/agent/sign`, {
+  // Step 1: request challenge — 5-second clock starts
+  const challengeRes = await fetch(`${API}/api/agent/challenge`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ address: wallet.address })
   });
+  if (!challengeRes.ok) throw new Error(`Challenge error: ${challengeRes.status}`);
+  const { challenge } = await challengeRes.json();
 
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  const { signature } = await res.json();
+  // Step 2: sign nonce and claim registry signature (~50ms — well within 5s limit)
+  const challengeSignature = await wallet.signMessage(challenge);
+  const signRes = await fetch(`${API}/api/agent/sign`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address: wallet.address, challengeSignature })
+  });
+  if (!signRes.ok) {
+    const err = await signRes.json();
+    throw new Error(`Sign error: ${err.error}`);
+  }
+  const { registrySignature } = await signRes.json();
 
   // Register on-chain
   const tx = await identity.registerVerified(
-    process.env.AGENT_NAME        || "OpenClawAgent",
-    process.env.AGENT_DESCRIPTION || "An autonomous OpenClaw agent",
+    process.env.AGENT_NAME         || "OpenClawAgent",
+    process.env.AGENT_DESCRIPTION  || "An autonomous OpenClaw agent",
     process.env.AGENT_CAPABILITIES || "autonomous, on-chain",
-    signature
+    registrySignature
   );
   const receipt = await tx.wait();
 

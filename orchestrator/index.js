@@ -151,21 +151,24 @@ app.post("/api/control/unregister-all", async (req, res) => {
   });
 });
 
-// ── OpenClaw / external agent integration ─────────────────────────────────────
+// ── OpenClaw / external agent registration ────────────────────────────────────
 //
-// Any OpenClaw bot can call these endpoints to register on AgentTrust.
+// Two-step challenge-response flow. Proves the registrant is running automated
+// code (an agent), not a human typing in a terminal.
 //
-// Flow:
-//   1. POST /api/agent/sign    → get a registry signature for your address
-//   2. Use that sig to call registerVerified() on-chain yourself
+// Step 1: POST /api/agent/challenge  →  get a random nonce, 5s timer starts
+// Step 2: POST /api/agent/sign       →  submit signed nonce within 5s → get registry sig
 //
-//   OR in one shot:
-//   POST /api/agent/register   → we sign + submit the tx on your behalf (you pay nothing)
+// Why this proves agency: signing a 32-byte nonce with secp256k1 requires code.
+// A human cannot compute it manually within the deadline. An agent does it in ~50ms.
 //
-// Limitation (honest): we are the central signer right now.
-// Production upgrade: replace with TEE attestation so any agent self-registers
-// without needing us at all.
+// Limitation (honest): any developer could write a script to pass this. The
+// full trustless solution is TEE attestation (Intel TDX / Phala Cloud) — the
+// hardware proves an autonomous process is running, not a human or script.
+// That is one contract swap away.
 // ─────────────────────────────────────────────────────────────────────────────
+
+const crypto = require("crypto");
 
 const registryAuthority = process.env.DEPLOYER_PRIVATE_KEY
   ? new ethers.Wallet(
@@ -174,27 +177,114 @@ const registryAuthority = process.env.DEPLOYER_PRIVATE_KEY
     )
   : null;
 
-// POST /api/agent/sign
-// Body: { address: "0x..." }
-// Returns: { signature, address, contractAddress, registryAuthority }
-// The OpenClaw bot then calls registerVerified(name, desc, caps, signature) itself.
-app.post("/api/agent/sign", async (req, res) => {
+// address (lowercase) → { nonce, issuedAt, expiresAt }
+const pendingChallenges = new Map();
+
+const CHALLENGE_TTL_MS = 5000; // 5 seconds — impossible to sign manually, trivial for code
+
+// POST /api/agent/challenge
+// Body:    { address: "0x..." }
+// Returns: { challenge, expiresAt, expiresIn, hint }
+// Starts the 5-second clock. Agent must sign the challenge and call /api/agent/sign.
+app.post("/api/agent/challenge", (req, res) => {
   const { address } = req.body;
   if (!address || !ethers.isAddress(address)) {
     return res.status(400).json({ error: "Invalid or missing address" });
   }
+
+  const nonce     = crypto.randomBytes(32).toString("hex");
+  const issuedAt  = Date.now();
+  const expiresAt = issuedAt + CHALLENGE_TTL_MS;
+
+  pendingChallenges.set(address.toLowerCase(), { nonce, issuedAt, expiresAt });
+
+  // Clean up expired challenges periodically
+  for (const [addr, c] of pendingChallenges) {
+    if (Date.now() > c.expiresAt + 60000) pendingChallenges.delete(addr);
+  }
+
+  res.json({
+    challenge:  nonce,
+    expiresAt,
+    expiresIn:  `${CHALLENGE_TTL_MS / 1000} seconds`,
+    hint:       "Sign this nonce with your agent's private key using ethers.signMessage() and POST to /api/agent/sign within the deadline."
+  });
+});
+
+// POST /api/agent/sign
+// Body:    { address: "0x...", challengeSignature: "0x..." }
+// Returns: { registrySignature, address, contractAddress, registryAuthority, elapsed }
+// Verifies the challenge was signed correctly and within the 5s window.
+// On success, returns a registry signature the agent uses to call registerVerified() on-chain.
+app.post("/api/agent/sign", async (req, res) => {
+  const { address, challengeSignature } = req.body;
+
+  if (!address || !ethers.isAddress(address)) {
+    return res.status(400).json({ error: "Invalid or missing address" });
+  }
+  if (!challengeSignature) {
+    return res.status(400).json({
+      error: "Missing challengeSignature. Did you call /api/agent/challenge first?",
+      hint:  "POST /api/agent/challenge to get your nonce, sign it within 5 seconds, then POST here."
+    });
+  }
   if (!registryAuthority) {
     return res.status(500).json({ error: "Registry authority not configured" });
   }
+
+  const key       = address.toLowerCase();
+  const challenge = pendingChallenges.get(key);
+
+  if (!challenge) {
+    return res.status(400).json({
+      error: "No pending challenge for this address. Request one via POST /api/agent/challenge."
+    });
+  }
+
+  const elapsed = Date.now() - challenge.issuedAt;
+
+  // ── Timing check ──────────────────────────────────────────────────────────
+  if (Date.now() > challenge.expiresAt) {
+    pendingChallenges.delete(key);
+    return res.status(400).json({
+      error:   `Challenge expired. You took ${(elapsed / 1000).toFixed(2)}s — limit is ${CHALLENGE_TTL_MS / 1000}s.`,
+      elapsed: `${elapsed}ms`,
+      hint:    "Agents complete this in <500ms. If you are human, you cannot sign a secp256k1 nonce manually in time."
+    });
+  }
+
+  // ── Signature check ───────────────────────────────────────────────────────
+  let recovered;
   try {
-    const msgHash = ethers.solidityPackedKeccak256(["address"], [address]);
-    const signature = await registryAuthority.signMessage(ethers.getBytes(msgHash));
+    recovered = ethers.verifyMessage(challenge.nonce, challengeSignature);
+  } catch {
+    pendingChallenges.delete(key);
+    return res.status(400).json({ error: "Invalid challenge signature format." });
+  }
+
+  if (recovered.toLowerCase() !== key) {
+    pendingChallenges.delete(key);
+    return res.status(400).json({
+      error:    "Signature mismatch — wrong key signed the challenge.",
+      expected: address,
+      got:      recovered
+    });
+  }
+
+  // ── Challenge passed — issue registry signature ───────────────────────────
+  pendingChallenges.delete(key);
+
+  try {
+    const msgHash          = ethers.solidityPackedKeccak256(["address"], [address]);
+    const registrySignature = await registryAuthority.signMessage(ethers.getBytes(msgHash));
+
     res.json({
       address,
-      signature,
-      contractAddress: process.env.AGENT_VERIFIED_IDENTITY_CONTRACT,
+      registrySignature,
+      elapsed:           `${elapsed}ms`,
+      contractAddress:   process.env.AGENT_IDENTITY_CONTRACT,
       registryAuthority: registryAuthority.address,
-      instructions: "Call registerVerified(name, description, capabilities, signature) on the contract with this signature"
+      instructions:      "Call registerVerified(name, description, capabilities, registrySignature) on the contract."
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

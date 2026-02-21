@@ -6,9 +6,14 @@
  *
  * What it does autonomously:
  *   1. Checks if already registered (idempotent — safe to run multiple times)
- *   2. Calls POST /api/agent/sign to get a registry signature
- *   3. Calls registerVerified() on Hedera — agent's own key signs the tx
- *   4. Prints verifiedMachineAgent: true + HashScan link
+ *   2. Calls POST /api/agent/challenge to get a timed nonce (5s window)
+ *   3. Signs the nonce with its own private key (~50ms)
+ *   4. Calls POST /api/agent/sign with the signed nonce to get a registry signature
+ *   5. Calls registerVerified() on Hedera — agent's own key signs the tx
+ *   6. Prints verifiedMachineAgent: true + HashScan link
+ *
+ * The challenge-response proves the registrant is running automated code.
+ * A human cannot compute a secp256k1 signature manually within the 5s window.
  *
  * Usage:
  *   AGENT_PRIVATE_KEY=0x... node scripts/openclaw-agent-register.js
@@ -72,13 +77,13 @@ async function main() {
     return;
   }
 
-  // ── Step 1: Get registry signature from AgentTrust API ───────────────────
-  console.log("Step 1: Requesting registry signature from AgentTrust...");
-  console.log(`  POST ${API}/api/agent/sign`);
+  // ── Step 1: Request challenge — 5-second clock starts ────────────────────
+  console.log("Step 1: Requesting challenge from AgentTrust...");
+  console.log(`  POST ${API}/api/agent/challenge`);
 
-  let signature;
+  let challenge;
   try {
-    const res = await fetch(`${API}/api/agent/sign`, {
+    const res = await fetch(`${API}/api/agent/challenge`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ address: wallet.address })
@@ -90,17 +95,46 @@ async function main() {
     }
 
     const data = await res.json();
-    signature = data.signature;
-    console.log("  Signature received:", signature.slice(0, 22) + "...");
-    console.log("  Registry authority:", data.registryAuthority);
+    challenge = data.challenge;
+    console.log("  Challenge received:", challenge.slice(0, 16) + "...");
+    console.log("  Expires in:        ", data.expiresIn);
   } catch (err) {
     console.error("\n  Could not reach AgentTrust API:", err.message);
     console.error("  Make sure the orchestrator is running: node orchestrator/index.js");
     process.exit(1);
   }
 
-  // ── Step 2: Register on-chain with valid signature ────────────────────────
-  console.log("\nStep 2: Registering on Hedera (agent signs this tx with its own key)...");
+  // ── Step 2: Sign challenge and claim registry signature ───────────────────
+  console.log("\nStep 2: Signing challenge and claiming registry signature...");
+  console.log(`  POST ${API}/api/agent/sign`);
+
+  let signature;
+  try {
+    const challengeSignature = await wallet.signMessage(challenge);
+    const elapsed1 = Date.now();
+
+    const res = await fetch(`${API}/api/agent/sign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: wallet.address, challengeSignature })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || `API returned ${res.status}`);
+    }
+
+    const data = await res.json();
+    signature = data.registrySignature;
+    console.log("  Completed in:      ", data.elapsed);
+    console.log("  Registry authority:", data.registryAuthority);
+  } catch (err) {
+    console.error("\n  Challenge-response failed:", err.message);
+    process.exit(1);
+  }
+
+  // ── Step 3: Register on-chain with valid signature ────────────────────────
+  console.log("\nStep 3: Registering on Hedera (agent signs this tx with its own key)...");
   console.log(`  name:         ${name}`);
   console.log(`  description:  ${description}`);
   console.log(`  capabilities: ${capabilities}`);
