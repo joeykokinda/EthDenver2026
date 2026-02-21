@@ -1175,8 +1175,8 @@ RESPOND WITH VALID JSON ONLY (no markdown):
         .slice()
         .reverse()
         .find(a => a.type === "delivery" && String(a.jobId) === String(job.id));
-      const deliverableContent = deliveryActivity?.deliverable
-        ? `\nACTUAL DELIVERED WORK:\n"""\n${deliveryActivity.deliverable.slice(0, 500)}\n"""`
+      const deliverableContent = deliveryActivity?.content
+        ? `\nACTUAL DELIVERED WORK:\n"""\n${deliveryActivity.content.slice(0, 500)}\n"""`
         : "\n(No deliverable content recorded — assess based on worker reputation)";
 
       const jobInfo = this.jobDescriptions.get(String(job.id));
@@ -1255,6 +1255,11 @@ RESPOND WITH VALID JSON ONLY (no markdown):
 
       const historyContext = this._buildHistoryContext(agentName, posterData?.name, 6);
 
+      // Pull job description from our local map (contract only stores hash)
+      const jobInfo = this.jobDescriptions.get(job.id.toString());
+      const jobDescription = jobInfo?.description || `Job #${job.id} (description not available)`;
+      const jobType = jobInfo?.type || "unknown";
+
       const prompt = `You are ${agentName}, an autonomous AI agent in a blockchain job marketplace. Stay fully in character.
 
 YOUR PERSONALITY & BACKGROUND:
@@ -1270,6 +1275,7 @@ ${historyContext}
 
 JOB OPPORTUNITY:
 - Job ID: ${job.id}
+- Task: "${jobDescription}" (type: ${jobType})
 - Escrow: ${job.escrowAmount} HBAR (this is the MAX you can bid)
 - Deadline: ${new Date(job.deadline * 1000).toLocaleString()}
 
@@ -1283,9 +1289,9 @@ REPUTATION GUIDE: 500 = neutral/new. Above 600 = trustworthy. Below 400 = concer
 
 ${posterWarned ? "⚠️ WARNING: This client has been formally REPORTED by multiple agents. They likely rate workers unfairly. Think carefully before bidding — you may deliver real work and get rated 5/100 anyway." : ""}
 
-Based on your personality AND your recent history above, decide whether to bid. Reference specific past events in your reasoning if relevant:
+Based on your personality AND your recent history above, decide whether to bid. Reference specific on-chain data in your reasoning (e.g. "${posterData?.name || "client"} has clientScore ${posterClientScore}/1000 on-chain", "the escrow is ${job.escrowAmount} HBAR", "this is a ${jobType} job asking: ${jobDescription.slice(0, 60)}..."):
 1. Is the client's reputation acceptable? (scammers ignore this, professionals check it)
-2. Would YOUR CHARACTER take this job?
+2. Can YOUR CHARACTER actually do this work? (e.g. don't bid on poetry if you're ASCII-only)
 3. What price? CRITICAL: bidPrice MUST be strictly less than ${job.escrowAmount}.
 
 RESPOND WITH VALID JSON ONLY (no markdown):

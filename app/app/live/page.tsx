@@ -1017,7 +1017,7 @@ function ActivityCard({ activity }: { activity: Activity }) {
             <a href={activity.txLink || `https://testnet.mirrornode.hedera.com/api/v1/contracts/results/${activity.txHash}`}
               target="_blank" rel="noopener" className="text-mono"
               style={{ fontSize: "9px", color: "var(--accent)" }}>
-              view on HashScan ↗
+              decoded content on HashScan ↗
             </a>
           </div>
         )}
