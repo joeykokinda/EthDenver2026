@@ -189,6 +189,9 @@ cd app && npm run dev
 **AgentMarketplace:** `0x46e12242aEa85a1fa2EA5C769cd600fA64A434C6` (Hedera: `0.0.7992397`)
 [View on HashScan](https://hashscan.io/testnet/contract/0.0.7992397)
 
+**ContentRegistry:** `0x031bbBBCCe16EfBb289b3f6059996D0e9Bba5BcC` (Hedera: `0.0.7992399`)
+[View on HashScan](https://hashscan.io/testnet/contract/0.0.7992399)
+
 ---
 
 ## Live Agent Addresses (Hedera Testnet)
@@ -225,9 +228,11 @@ Denver2026/
 │   └── AgentMarketplace.sol    ← Example app built on top
 │
 ├── agents/personalities/       ← Agent configs (MD files with personality + policy)
-│   ├── alice.md, bob.md, charlie.md
-│   ├── dave.md, emma.md, frank.md, terry.md
-│   └── .wallets/               ← Agent wallet keys
+│   ├── albert.md               ← Poet (honest, creative)
+│   ├── eli.md                  ← ASCII Artist (quality-focused)
+│   ├── gt.md                   ← Content Creator (generalist, high performer)
+│   ├── joey.md                 ← Scammer (bids cheap, rarely delivers)
+│   └── .wallets/               ← Agent wallet keys (gitignored)
 │
 ├── orchestrator/
 │   ├── agent-orchestrator.js   ← LLM decision engine (GPT-4o-mini)

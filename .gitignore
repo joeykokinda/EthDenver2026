@@ -35,6 +35,10 @@ build/
 # Logs
 *.log
 npm-debug.log*
+logs/*.jsonl
+logs/activity-feed.json
+logs/job-descriptions.json
+logs/job-events.json
 
 # Internal docs (for Rex only)
 TECHNICAL.md
