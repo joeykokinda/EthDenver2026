@@ -465,11 +465,20 @@ RESPOND WITH VALID JSON ONLY:
       // Save snapshot for reputation API
       this.lastSnapshot = snapshot;
 
-      // Phase 1: Buyers post new jobs (honest agents only for reliable demo flow)
+      // Phase 1: Buyers post new jobs
       // Count only jobs posted in this session (we know the description) — ignores old/stale chain jobs
       const ourJobs = snapshot.openJobs.filter(j => this.jobDescriptions.has(j.id.toString()));
       if (ourJobs.length < 2) {
-        const buyers = ["albert", "eli", "gt"]; // exclude joey — his jobs get no bids and block the queue
+        // Joey posts ~1 in 4 jobs so the scam scenario triggers — but cap at 1 open Joey job
+        // so the queue doesn't stall (honest agents won't bid on his jobs once his clientScore tanks)
+        const joeyOpenJobs = ourJobs.filter(j => {
+          const jobInfo = this.jobDescriptions.get(j.id.toString());
+          return jobInfo?.poster === "joey";
+        });
+        const joeyCanPost = joeyOpenJobs.length === 0; // max 1 open joey job at a time
+        const useJoey = joeyCanPost && Math.random() < 0.30; // 30% chance joey posts
+
+        const buyers = useJoey ? ["joey"] : ["albert", "eli", "gt"];
         const randomBuyer = buyers[Math.floor(Math.random() * buyers.length)];
         if (this.agents.has(randomBuyer)) {
           await this.postRandomJob(randomBuyer);
@@ -1431,7 +1440,7 @@ RESPOND WITH VALID JSON ONLY (no markdown):
       
       // Save description so workers know what to deliver (contract only stores hash)
       if (result.data?.jobId) {
-        this.jobDescriptions.set(result.data.jobId.toString(), { description: job.desc, type: job.type });
+        this.jobDescriptions.set(result.data.jobId.toString(), { description: job.desc, type: job.type, poster: agentName });
       }
 
       // Publish job description on-chain so it's visible on HashScan (non-fatal)
