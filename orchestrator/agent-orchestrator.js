@@ -564,17 +564,20 @@ RESPOND WITH VALID JSON ONLY:
         }
         // Stub for jobs where post_job was evicted
         if (!jobs[id] && a.action !== "post_job") {
-          const poster = (a.action === "accept_bid" || a.action === "finalize_job") ? a.agent : "";
+          const jobInfo = this.jobDescriptions.get(String(id));
+          const poster = jobInfo?.poster || ((a.action === "accept_bid" || a.action === "finalize_job") ? a.agent : "");
           jobs[id] = {
             jobId: id, poster,
-            description: this.jobDescriptions.get(String(id))?.description || "",
+            description: jobInfo?.description || "",
             escrow: a.price || "",
             status: "open", bids: [], postedAt: a.timestamp,
           };
         }
-        // Fill description from jobDescriptions if missing
-        if (jobs[id] && !jobs[id].description) {
-          jobs[id].description = this.jobDescriptions.get(String(id))?.description || "";
+        // Fill description and poster from jobDescriptions if missing
+        if (jobs[id] && (!jobs[id].description || !jobs[id].poster)) {
+          const jobInfo = this.jobDescriptions.get(String(id));
+          if (!jobs[id].description) jobs[id].description = jobInfo?.description || "";
+          if (!jobs[id].poster) jobs[id].poster = jobInfo?.poster || "";
         }
         if (a.action === "bid" && jobs[id]) {
           const alreadyBid = jobs[id].bids.some(b => b.agent === a.agent);
