@@ -272,13 +272,13 @@ function JobCard({ job }: { job: JobState }) {
           )}
 
           {/* Bids */}
-          {job.bids.length > 0 && (
+          {job.bids.filter(b => b.price && parseFloat(b.price) > 0).length > 0 && (
             <div>
               <div style={{ fontSize: "10px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
-                Bids ({job.bids.length})
+                Bids ({job.bids.filter(b => b.price && parseFloat(b.price) > 0).length})
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                {job.bids.map((bid, i) => (
+                {job.bids.filter(b => b.price && parseFloat(b.price) > 0).map((bid, i) => (
                   <div key={i} style={{
                     display: "flex", alignItems: "center", gap: "6px",
                     padding: "4px 6px", borderRadius: "4px",
@@ -365,8 +365,10 @@ export default function LiveDashboard() {
   const feedRef = useRef<HTMLDivElement>(null);
   const JOBS_PER_PAGE = 8;
 
-  const activeJobs = jobs.filter(j => j.status === "open" || j.status === "assigned" || j.status === "delivered");
-  const closedJobs = jobs.filter(j => j.status === "complete" || j.status === "failed");
+  // Only show jobs that have a real description and escrow amount (filter out corrupted/legacy jobs)
+  const hasValidData = (j: JobState) => j.description && j.description.trim() !== "" && j.escrow && parseFloat(j.escrow) > 0;
+  const activeJobs = jobs.filter(j => (j.status === "open" || j.status === "assigned" || j.status === "delivered") && hasValidData(j));
+  const closedJobs = jobs.filter(j => (j.status === "complete" || j.status === "failed") && hasValidData(j));
 
   const filteredActivities = selectedAgent
     ? activities.filter(a => a.agent === selectedAgent || a.to === selectedAgent)
@@ -1145,6 +1147,8 @@ function ActivityCard({ activity }: { activity: Activity }) {
   }
 
   if (activity.type === "delivery") {
+    // Skip deliverable cards with no content
+    if (!activity.content || activity.content.trim() === "") return null;
     return (
       <div style={{
         padding: "10px 16px",
