@@ -170,10 +170,14 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
   failed:    { label: "FAILED",   color: "#f87171" },
 };
 
+function normalizeNewlines(s?: string) {
+  return s?.replace(/\\n/g, '\n') ?? '';
+}
+
 function JobCard({ job }: { job: JobState }) {
-  const [expanded, setExpanded] = useState(true);
-  const st = STATUS_META[job.status] || { label: job.status.toUpperCase(), color: "#94a3b8" };
   const isDone = job.status === "complete" || job.status === "failed";
+  const [expanded, setExpanded] = useState(!isDone);
+  const st = STATUS_META[job.status] || { label: job.status.toUpperCase(), color: "#94a3b8" };
 
   return (
     <div style={{
@@ -294,9 +298,10 @@ function JobCard({ job }: { job: JobState }) {
                 fontSize: "11px", lineHeight: "1.6",
                 fontFamily: "monospace", whiteSpace: "pre-wrap",
                 color: "var(--text-primary)",
-                maxHeight: "130px", overflowY: "auto"
+                maxHeight: "120px", overflowY: "auto",
+                wordBreak: "break-word"
               }}>
-                {job.deliverable}
+                {normalizeNewlines(job.deliverable)}
               </div>
             </div>
           )}
@@ -669,15 +674,17 @@ export default function LiveDashboard() {
                   No jobs yet. Waiting for agents...
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "calc(100vh - 180px)", overflowY: "auto" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "calc(100vh - 160px)", overflowY: "auto", paddingRight: "2px" }}>
                   {activeJobs.map(job => <JobCard key={job.jobId} job={job} />)}
 
                   {closedJobs.length > 0 && (
-                    <div style={{ fontSize: "9px", color: "var(--text-dim)", textAlign: "center", padding: "6px 0", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                      {activeJobs.length > 0 && "— "}closed ({closedJobs.length}){activeJobs.length > 0 && " —"}
-                    </div>
+                    <>
+                      <div style={{ fontSize: "9px", color: "var(--text-dim)", textAlign: "center", padding: "8px 0 4px", textTransform: "uppercase", letterSpacing: "0.5px", borderTop: "1px solid var(--border)", marginTop: "2px" }}>
+                        Closed ({closedJobs.length})
+                      </div>
+                      {closedJobs.map(job => <JobCard key={job.jobId} job={job} />)}
+                    </>
                   )}
-                  {closedJobs.map(job => <JobCard key={job.jobId} job={job} />)}
                 </div>
               )}
             </div>
@@ -1035,9 +1042,10 @@ function ActivityCard({ activity }: { activity: Activity }) {
           marginLeft: "24px", padding: "8px 12px",
           background: "rgba(244,114,182,0.05)", border: "1px solid rgba(244,114,182,0.2)",
           borderRadius: "4px", fontSize: "12px", lineHeight: "1.7",
-          fontFamily: "monospace", whiteSpace: "pre-wrap", color: "var(--text-primary)"
+          fontFamily: "monospace", whiteSpace: "pre-wrap", color: "var(--text-primary)",
+          wordBreak: "break-word"
         }}>
-          {activity.content}
+          {normalizeNewlines(activity.content)}
         </div>
         {(activity.txLink || activity.txHash) && (
           <div style={{ marginLeft: "24px", marginTop: "4px" }}>
