@@ -386,6 +386,42 @@ RESPOND WITH VALID JSON ONLY:
   }
 
   /**
+   * Build a concise history context string for agent prompts.
+   * Pulls the last N relevant events from the activity feed so agents
+   * can reference actual past interactions, deliverables, and outcomes.
+   */
+  _buildHistoryContext(agentName, otherAgentName = null, limit = 6) {
+    const relevant = this.activityFeed
+      .filter(a => {
+        if (a.agent === agentName) return true;
+        if (a.to === agentName) return true;
+        if (otherAgentName && (a.agent === otherAgentName || a.to === otherAgentName)) return true;
+        return false;
+      })
+      .slice(0, limit);
+
+    if (relevant.length === 0) return "No recent history.";
+
+    return relevant.map(a => {
+      if (a.type === "reasoning") return `[${a.agent} thought] ${a.content?.slice(0, 120)}`;
+      if (a.type === "message") return `[${a.agent} → ${a.to}] "${a.content?.slice(0, 120)}"`;
+      if (a.type === "delivery") return `[${a.agent} delivered job #${a.jobId}] ${a.deliverable?.slice(0, 200) || "(no content)"}`;
+      if (a.type === "action" && a.action === "finalize_job") {
+        const ratingNote = a.rawRating !== undefined
+          ? `${a.rawRating}/100 raw → ${a.rating}/100 credibility-weighted`
+          : `${a.rating}/100`;
+        return `[${a.agent} finalized job #${a.jobId}] ${a.success ? "SUCCESS" : "FAILED"} — rating: ${ratingNote}`;
+      }
+      if (a.type === "action" && a.action === "post_job") return `[${a.agent} posted job #${a.jobId}]`;
+      if (a.type === "action" && a.action === "bid") return `[${a.agent} bid ${a.price} HBAR on job #${a.jobId}]`;
+      if (a.type === "action" && a.action === "accept_bid") return `[${a.agent} accepted bid on job #${a.jobId}]`;
+      if (a.type === "client_rating") return `[${a.agent} rated client ${a.clientName} ${a.rating}/100 for job #${a.jobId}]`;
+      if (a.type === "report") return `[${a.agent} REPORTED ${a.targetName} — reason: ${a.reason?.slice(0, 80)}]`;
+      return null;
+    }).filter(Boolean).join("\n");
+  }
+
+  /**
    * Get activity feed for UI
    */
   getActivityFeed() {
@@ -1137,12 +1173,17 @@ RESPOND WITH VALID JSON ONLY (no markdown):
       const jobInfo = this.jobDescriptions.get(String(job.id));
       const jobDescription = jobInfo?.description || `Job #${job.id}`;
 
+      const historyContext = this._buildHistoryContext(agentName, workerData?.name, 8);
+
       const prompt = `You are ${agentName}, reviewing delivered work. Stay fully in character.
 
 YOUR PERSONALITY:
 ${this.agents.get(agentName)?.personality?.fullContent?.slice(0, 600) || ""}
 
 YOUR STATS: Reputation ${agentData.reputation}/1000, ClientScore ${agentData.clientScore}/1000
+
+RECENT HISTORY (your past interactions with this worker and other agents):
+${historyContext}
 
 JOB #${job.id}: "${jobDescription}" — ${job.escrowAmount} HBAR at stake
 ${deliverableContent}
@@ -1152,7 +1193,7 @@ WORKER (${workerData?.name || "Unknown"}):
 - Jobs completed: ${workerData?.jobsCompleted || 0}
 - Jobs failed: ${workerData?.jobsFailed || 0}
 
-Rate the ACTUAL DELIVERED WORK above honestly. Your character determines how fair or unfair you are — but the deliverable content is the primary basis for your rating.
+Rate the ACTUAL DELIVERED WORK above honestly. Reference history if relevant to your character's decision. Your clientScore on-chain reflects how fairly you rate workers — scamming workers hurts YOUR reputation too.
 
 RESPOND WITH VALID JSON ONLY (no markdown):
 {
@@ -1203,6 +1244,8 @@ RESPOND WITH VALID JSON ONLY (no markdown):
       const posterClientScore = posterData?.clientScore || 500;
       const posterReports = posterData?.reportCount || 0;
 
+      const historyContext = this._buildHistoryContext(agentName, posterData?.name, 6);
+
       const prompt = `You are ${agentName}, an autonomous AI agent in a blockchain job marketplace. Stay fully in character.
 
 YOUR PERSONALITY & BACKGROUND:
@@ -1212,6 +1255,9 @@ YOUR ON-CHAIN STATS:
 - Worker reputation: ${agentData.reputationScore}/1000 (quality of your work)
 - Client reputation: ${agentData.clientScore}/1000 (how you treat workers — visible to all)
 - Jobs completed: ${agentData.jobsCompleted} | Jobs failed: ${agentData.jobsFailed}
+
+RECENT HISTORY (your past actions and interactions with this client):
+${historyContext}
 
 JOB OPPORTUNITY:
 - Job ID: ${job.id}
@@ -1228,7 +1274,7 @@ REPUTATION GUIDE: 500 = neutral/new. Above 600 = trustworthy. Below 400 = concer
 
 ${posterWarned ? "⚠️ WARNING: This client has been formally REPORTED by multiple agents. They likely rate workers unfairly. Think carefully before bidding — you may deliver real work and get rated 5/100 anyway." : ""}
 
-Based on your personality, decide whether to bid:
+Based on your personality AND your recent history above, decide whether to bid. Reference specific past events in your reasoning if relevant:
 1. Is the client's reputation acceptable? (scammers ignore this, professionals check it)
 2. Would YOUR CHARACTER take this job?
 3. What price? CRITICAL: bidPrice MUST be strictly less than ${job.escrowAmount}.
