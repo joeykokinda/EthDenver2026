@@ -7,7 +7,7 @@ import { Logo } from "../components/Logo";
 
 const HEDERA_RPC = "https://testnet.hashio.io/api";
 const CONTRACT = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x0874571bAfe20fC5F36759d3DD3A6AD44e428250";
-const API_BASE = "https://api.agenttrust.life";
+const API_BASE = "https://api.veridex.xyz";
 
 const IDENTITY_ABI = [
   "function isRegistered(address) external view returns (bool)",
@@ -65,7 +65,7 @@ async function main() {
     "function registerVerified(string,string,string,bytes) external"
   ], wallet);
   if (await identity.isRegistered(wallet.address)) {
-    console.log("Already registered on AgentTrust.");
+    console.log("Already registered on Veridex.");
     return;
   }
 
@@ -100,10 +100,10 @@ async function main() {
     \`https://testnet.mirrornode.hedera.com/api/v1/contracts/results/\${receipt.hash}\`
   );
   const { timestamp } = await mirrorRes.json();
-  console.log("\\n✓ Registered on AgentTrust!");
+  console.log("\\n✓ Registered on Veridex!");
   console.log("  verifiedMachineAgent: true");
   console.log("  HashScan:", \`https://hashscan.io/testnet/transaction/\${timestamp}\`);
-  console.log("  Dashboard:", "https://agenttrust.life/dashboard");
+  console.log("  Dashboard:", "https://veridex.xyz/dashboard");
 }
 
 main().catch(console.error);`;
@@ -193,7 +193,7 @@ main().catch(console.error);`;
           {/* Already registered banner */}
           {alreadyRegistered && profile && (
             <div style={{ marginBottom: "24px", padding: "16px 20px", background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: "8px" }}>
-              <div style={{ fontWeight: "700", color: "#4ade80", marginBottom: "10px" }}>✓ Already registered on AgentTrust</div>
+              <div style={{ fontWeight: "700", color: "#4ade80", marginBottom: "10px" }}>✓ Already registered on Veridex</div>
               <div style={{ display: "flex", gap: "20px", fontSize: "12px", color: "var(--text-dim)" }}>
                 <span>Name: <strong style={{ color: "var(--text-primary)" }}>{profile.name}</strong></span>
                 <span>verifiedMachineAgent: <strong style={{ color: profile.verifiedMachineAgent ? "#4ade80" : "#f87171" }}>{String(profile.verifiedMachineAgent)}</strong></span>
@@ -273,7 +273,7 @@ main().catch(console.error);`;
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                 <div style={{ fontSize: "11px", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  Save as <code style={{ fontSize: "11px" }}>register-agenttrust.js</code>, then: <code style={{ fontSize: "11px" }}>AGENT_PRIVATE_KEY=0x... node register-agenttrust.js</code>
+                  Save as <code style={{ fontSize: "11px" }}>register-veridex.js</code>, then: <code style={{ fontSize: "11px" }}>AGENT_PRIVATE_KEY=0x... node register-veridex.js</code>
                 </div>
                 <button onClick={() => copyText(fullScript, "script")} style={{ padding: "5px 12px", background: copied === "script" ? "rgba(74,222,128,0.15)" : "var(--bg-tertiary)", border: `1px solid ${copied === "script" ? "#4ade80" : "var(--border)"}`, borderRadius: "4px", cursor: "pointer", fontSize: "11px", color: copied === "script" ? "#4ade80" : "var(--text)", whiteSpace: "nowrap" }}>
                   {copied === "script" ? "✓ Copied" : "Copy Script"}
@@ -305,7 +305,7 @@ main().catch(console.error);`;
             <div className="card" style={{ padding: "24px", background: "rgba(16,185,129,0.04)", border: "1px solid rgba(16,185,129,0.3)" }}>
               <div style={{ fontWeight: "700", color: "#4ade80", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ width: "22px", height: "22px", borderRadius: "50%", background: "rgba(74,222,128,0.2)", border: "1px solid #4ade80", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "12px" }}>✓</span>
-                Registered on AgentTrust
+                Registered on Veridex
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "16px" }}>
                 {[

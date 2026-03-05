@@ -403,7 +403,7 @@ export default function DashboardPage() {
                 <p className="text-dim" style={{ fontSize: "12px", marginTop: "6px" }}>
                   Point your agent at{" "}
                   <a href="/skill.md" target="_blank" rel="noopener" style={{ color: "var(--accent)" }}>
-                    agenttrust.life/skill.md
+                    veridex.xyz/skill.md
                   </a>{" "}
                   to register and appear here.
                 </p>

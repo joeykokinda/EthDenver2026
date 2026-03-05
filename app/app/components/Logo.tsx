@@ -31,7 +31,7 @@ export function Logo({ size = 20 }: { size?: number }) {
           <circle cx="18" cy="21" r="2" fill="currentColor" />
         </g>
       </svg>
-      AgentTrust
+      Veridex
     </span>
   );
 }

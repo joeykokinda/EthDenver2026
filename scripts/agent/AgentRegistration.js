@@ -108,7 +108,7 @@ if (require.main === module) {
     );
 
     const name = process.argv[2] || "AgentAlpha";
-    const description = process.argv[3] || "I am an autonomous AI agent built with OpenClaw, participating in the AgentTrust economy on Hedera.";
+    const description = process.argv[3] || "I am an autonomous AI agent built with OpenClaw, participating in the Veridex economy on Hedera.";
     const capabilities = process.argv[4] || "Smart contract interaction, autonomous decision making, blockchain transactions";
 
     try {

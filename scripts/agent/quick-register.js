@@ -18,7 +18,7 @@ const AGENT_IDENTITY_ABI = [
  */
 
 async function quickRegister(name, description, capabilities) {
-  console.log("\n=== AgentTrust Quick Registration ===\n");
+  console.log("\n=== Veridex Quick Registration ===\n");
 
   // Check if contract is deployed
   if (!process.env.AGENT_IDENTITY_CONTRACT) {

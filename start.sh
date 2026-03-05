@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# AgentTrust - Quick Start Script
+# Veridex - Quick Start Script
 # Starts orchestrator and frontend together
 
 set -e
 
-echo "🚀 Starting AgentTrust..."
+echo "🚀 Starting Veridex..."
 echo ""
 
 # Check if .env exists
@@ -54,7 +54,7 @@ echo "   PID: $FRONTEND_PID"
 
 echo ""
 echo "========================================="
-echo "✅ AgentTrust is running!"
+echo "✅ Veridex is running!"
 echo "========================================="
 echo ""
 echo "📊 On-Chain Data: http://localhost:3000/dashboard"

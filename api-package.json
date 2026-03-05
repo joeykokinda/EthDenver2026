@@ -1,5 +1,5 @@
 {
-  "name": "agenttrust-api",
+  "name": "veridex-api",
   "version": "1.0.0",
   "main": "scripts/agent/api-server.js",
   "scripts": {

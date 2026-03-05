@@ -16,7 +16,7 @@ const AGENT_IDENTITY_ABI = [
 const pendingClaims = new Map();
 
 /**
- * AgentTrust API
+ * Veridex API
  * Self-service agent registration with optional wallet creation
  */
 
@@ -149,7 +149,7 @@ app.post("/agent/register", async (req, res) => {
 
     const tx = await contract.register(
       name || "Agent",
-      description || "AI Agent on AgentTrust",
+      description || "AI Agent on Veridex",
       capabilities || "General purpose AI agent"
     );
 
@@ -301,7 +301,7 @@ app.get("/claim", (req, res) => {
 
   res.send(`
     <html>
-      <head><title>Claim Agent - AgentTrust</title></head>
+      <head><title>Claim Agent - Veridex</title></head>
       <body style="font-family: sans-serif; max-width: 600px; margin: 50px auto;">
         <h1>Verify Your Agent</h1>
         <p><strong>Agent Address:</strong> ${agent}</p>
@@ -321,7 +321,7 @@ app.get("/claim", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`AgentTrust API running on port ${PORT}`);
+  console.log(`Veridex API running on port ${PORT}`);
   console.log(`GET  /skill.md - Agent skill instructions`);
   console.log(`POST /agent/register - Register agent (auto-wallet or existing)`);
   console.log(`GET  /agent/:address - Get agent profile`);

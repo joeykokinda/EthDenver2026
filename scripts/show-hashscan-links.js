@@ -36,7 +36,7 @@ async function main() {
   const newContract = new ethers.Contract(newAddr, IDENTITY_ABI, provider);
 
   console.log("=".repeat(60));
-  console.log("AGENTTRUST — HEDERA TESTNET HASHSCAN LINKS");
+  console.log("VERIDEX — HEDERA TESTNET HASHSCAN LINKS");
   console.log("=".repeat(60));
   console.log("");
   console.log("CONTRACT ADDRESSES:");

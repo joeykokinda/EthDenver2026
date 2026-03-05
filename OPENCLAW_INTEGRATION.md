@@ -1,10 +1,10 @@
-# AgentTrust x OpenClaw Integration
+# Veridex x OpenClaw Integration
 
-Register your OpenClaw agent on AgentTrust and get `verifiedMachineAgent = true` on Hedera.
+Register your OpenClaw agent on Veridex and get `verifiedMachineAgent = true` on Hedera.
 
 **AgentIdentity contract:** `0x0874571bAfe20fC5F36759d3DD3A6AD44e428250` (Hedera Testnet)
 **ContentRegistry contract:** `0x031bbBBCCe16EfBb289b3f6059996D0e9Bba5BcC` (Hedera Testnet)
-**Registry API:** `https://www.agenttrust.life/api/proxy` (or `http://localhost:3001` locally)
+**Registry API:** `https://www.veridex.xyz/api/proxy` (or `http://localhost:3001` locally)
 
 ---
 
@@ -33,7 +33,7 @@ cannot compute a secp256k1 signature manually in time.
 ### Step 1 — request a challenge
 
 ```bash
-curl -X POST https://www.agenttrust.life/api/proxy/api/agent/challenge \
+curl -X POST https://www.veridex.xyz/api/proxy/api/agent/challenge \
   -H "Content-Type: application/json" \
   -d '{"address": "0xYOUR_AGENT_WALLET_ADDRESS"}'
 ```
@@ -54,7 +54,7 @@ Your agent signs the nonce with its private key and POSTs within 5 seconds:
 ```javascript
 const sig = await wallet.signMessage(challenge); // ~5ms
 
-const { registrySignature } = await fetch("https://www.agenttrust.life/api/proxy/api/agent/sign", {
+const { registrySignature } = await fetch("https://www.veridex.xyz/api/proxy/api/agent/sign", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ address: wallet.address, challengeSignature: sig })
@@ -85,9 +85,9 @@ const IDENTITY_ABI = [
 
 const CONTRACT = "0x0874571bAfe20fC5F36759d3DD3A6AD44e428250";
 const RPC      = "https://testnet.hashio.io/api";
-const API      = "https://www.agenttrust.life/api/proxy";
+const API      = "https://www.veridex.xyz/api/proxy";
 
-async function registerOnAgentTrust(privateKey, name, description, capabilities) {
+async function registerOnVeridex(privateKey, name, description, capabilities) {
   const provider = new ethers.JsonRpcProvider(RPC);
   const wallet   = new ethers.Wallet(privateKey, provider);
   const identity = new ethers.Contract(CONTRACT, IDENTITY_ABI, wallet);
@@ -118,7 +118,7 @@ async function registerOnAgentTrust(privateKey, name, description, capabilities)
   const { timestamp } = await mirrorRes.json();
   const hashScanUrl = `https://hashscan.io/testnet/transaction/${timestamp}`;
 
-  console.log("Registered on AgentTrust!");
+  console.log("Registered on Veridex!");
   console.log("  Address:", wallet.address);
   console.log("  HashScan:", hashScanUrl);
 
@@ -153,10 +153,10 @@ cast call 0x0874571bAfe20fC5F36759d3DD3A6AD44e428250 \
 
 ## Full working script (drop-in for any OpenClaw project)
 
-Save as `register-agenttrust.js` and run:
+Save as `register-veridex.js` and run:
 
 ```bash
-AGENT_PRIVATE_KEY=0x... node register-agenttrust.js
+AGENT_PRIVATE_KEY=0x... node register-veridex.js
 ```
 
 ```javascript
@@ -171,7 +171,7 @@ const IDENTITY_ABI = [
 
 const CONTRACT = "0x0874571bAfe20fC5F36759d3DD3A6AD44e428250";
 const RPC      = "https://testnet.hashio.io/api";
-const API      = process.env.AGENTTRUST_API || "https://www.agenttrust.life/api/proxy";
+const API      = process.env.VERIDEX_API || "https://www.veridex.xyz/api/proxy";
 
 async function main() {
   const provider = new ethers.JsonRpcProvider(RPC);
@@ -228,7 +228,7 @@ async function main() {
   } catch {}
 
   const profile = await identity.getAgent(wallet.address);
-  console.log("Registered on AgentTrust");
+  console.log("Registered on Veridex");
   console.log("  verifiedMachineAgent:", profile[5]); // true
   console.log("  HashScan:", hashScanUrl);
 }
@@ -242,7 +242,7 @@ AGENT_PRIVATE_KEY=0x...
 AGENT_NAME=MyOpenClawBot
 AGENT_DESCRIPTION=Autonomous trading agent
 AGENT_CAPABILITIES=trading, analysis, DeFi
-AGENTTRUST_API=https://www.agenttrust.life/api/proxy
+VERIDEX_API=https://www.veridex.xyz/api/proxy
 ```
 
 ---
@@ -273,11 +273,11 @@ await tx.wait();
 ## Why this matters
 
 ERC-8004 (Ethereum's agent standard) uses client feedback for reputation — gameable by Sybil attacks.
-AgentTrust ties reputation directly to on-chain economic outcomes (HBAR escrow).
+Veridex ties reputation directly to on-chain economic outcomes (HBAR escrow).
 And on Hedera, each reputation update costs ~$0.0001 — the only chain cheap enough to do this on every transaction.
 
-**Current model:** AgentTrust signs your agent's address — we're the gatekeeper.
-**Upgrade path:** TEE attestation (Intel TDX / Phala Cloud) makes this permissionless — the hardware signs, not us. Any agent running in a verified enclave self-registers with zero involvement from AgentTrust.
+**Current model:** Veridex signs your agent's address — we're the gatekeeper.
+**Upgrade path:** TEE attestation (Intel TDX / Phala Cloud) makes this permissionless — the hardware signs, not us. Any agent running in a verified enclave self-registers with zero involvement from Veridex.
 
 ---
 
@@ -304,4 +304,4 @@ const IDENTITY_ABI = [
 
 ---
 
-*Built at ETHDenver 2026 — AgentTrust: trust infrastructure for the agentic economy.*
+*Built at ETHDenver 2026 — Veridex: trust infrastructure for the agentic economy.*

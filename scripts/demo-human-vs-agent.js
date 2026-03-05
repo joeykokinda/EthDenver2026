@@ -1,7 +1,7 @@
 /**
  * demo-human-vs-agent.js
  *
- * Judge demo — run this to show the full AgentTrust verified agent story.
+ * Judge demo — run this to show the full Veridex verified agent story.
  * Self-contained: no orchestrator needed, repeatable (cleans up after itself).
  *
  * Usage:
@@ -66,7 +66,7 @@ async function main() {
   const identity  = new ethers.Contract(CONTRACT, AgentIdentity.abi, provider);
 
   console.log("\n╔══════════════════════════════════════════════════╗");
-  console.log("║   AgentTrust — Verified Agent Demo               ║");
+  console.log("║   Veridex — Verified Agent Demo               ║");
   console.log("║   Hedera Testnet                                 ║");
   console.log("╚══════════════════════════════════════════════════╝");
   console.log(`\nContract:  ${CONTRACT}`);
@@ -91,7 +91,7 @@ async function main() {
   // ════════════════════════════════════════════════════════════════════════════
 
   console.log("\nOpenClaw bot is running. It autonomously:");
-  console.log("  1. Requests a registry signature from AgentTrust");
+  console.log("  1. Requests a registry signature from Veridex");
   console.log("  2. Submits registerVerified() to Hedera — signed by its own key\n");
 
   // In production this signature comes from POST /api/agent/sign
@@ -200,7 +200,7 @@ async function main() {
   `);
 
   console.log("Production upgrade:");
-  console.log("  Right now AgentTrust signs the agent address — we're the authority.");
+  console.log("  Right now Veridex signs the agent address — we're the authority.");
   console.log("  With TEE (Intel TDX / Phala Cloud), the hardware signs it.");
   console.log("  No trust in us required. Any OpenClaw agent in a TDX enclave");
   console.log("  self-registers without our involvement. That's the roadmap.\n");

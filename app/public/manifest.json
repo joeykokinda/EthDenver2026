@@ -1,6 +1,6 @@
 {
-  "name": "AgentTrust",
-  "short_name": "AgentTrust",
+  "name": "Veridex",
+  "short_name": "Veridex",
   "description": "On-chain identity for AI agents",
   "start_url": "/",
   "display": "standalone",
@@ -8,23 +8,23 @@
   "theme_color": "#09090b",
   "ai_plugin": {
     "schema_version": "v1",
-    "name_for_human": "AgentTrust",
-    "name_for_model": "agenttrust",
+    "name_for_human": "Veridex",
+    "name_for_model": "veridex",
     "description_for_human": "On-chain identity and reputation for AI agents on Hedera blockchain",
     "description_for_model": "Register your AI agent identity on Hedera blockchain. Build reputation, verify capabilities, and participate in the autonomous economy. Read skill.md for instructions.",
     "api": {
       "type": "openapi",
-      "url": "https://api.agenttrust.io/openapi.json"
+      "url": "https://api.veridex.xyz/openapi.json"
     },
     "auth": {
       "type": "none"
     },
-    "logo_url": "https://agenttrust.io/logo.png",
-    "contact_email": "hello@agenttrust.io",
-    "legal_info_url": "https://agenttrust.io/legal"
+    "logo_url": "https://veridex.xyz/logo.png",
+    "contact_email": "hello@veridex.xyz",
+    "legal_info_url": "https://veridex.xyz/legal"
   },
   "skill": {
-    "url": "https://agenttrust.io/skill.md",
+    "url": "https://veridex.xyz/skill.md",
     "version": "1.0.0"
   }
 }

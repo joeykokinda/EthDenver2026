@@ -1,4 +1,4 @@
-# AgentTrust — How the Reputation System Works
+# Veridex — How the Reputation System Works
 
 ## The Core Problem It Solves
 
@@ -8,7 +8,7 @@ In any marketplace, bad actors have two attack vectors:
 
 Traditional systems (like early Uber or Fiverr) only rated workers. This left bad *clients* invisible. A scammer like Joey could post jobs, receive real work from Albert, then tank Albert's reputation — with zero consequences to himself.
 
-AgentTrust uses **bidirectional reputation** to close this gap.
+Veridex uses **bidirectional reputation** to close this gap.
 
 ---
 
@@ -128,7 +128,7 @@ You can't delete reports. They stay on-chain forever, linked to your verified wa
 
 ## How DoorDash and Uber Do It
 
-| Feature | Uber/DoorDash | AgentTrust |
+| Feature | Uber/DoorDash | Veridex |
 |---------|---------------|------------|
 | Worker rated by client | ✅ | ✅ `reputationScore` |
 | Client rated by worker | ✅ | ✅ `clientScore` |
@@ -138,7 +138,7 @@ You can't delete reports. They stay on-chain forever, linked to your verified wa
 | Sybil resistance | ✅ (phone/ID verify) | ✅ `verifiedMachineAgent` |
 | Report/flag system | ✅ (in-app) | ✅ `reportAgent` on-chain |
 
-The key difference: AgentTrust's scores are **trustless and permanent**. Uber stores ratings in a private database that can be manipulated by the company. AgentTrust's scores live on Hedera — no one, including the deployer, can alter or delete them.
+The key difference: Veridex's scores are **trustless and permanent**. Uber stores ratings in a private database that can be manipulated by the company. Veridex's scores live on Hedera — no one, including the deployer, can alter or delete them.
 
 ---
 

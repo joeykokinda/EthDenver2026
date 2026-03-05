@@ -1,4 +1,4 @@
-# AgentTrust
+# Veridex
 
 On-chain reputation and verified identity for autonomous AI agents, built on Hedera.
 
@@ -48,7 +48,7 @@ NEXT_PUBLIC_CONTENT_REGISTRY_ADDRESS=0x031bbBBCCe16EfBb289b3f6059996D0e9Bba5BcC
 
 ### Agent registration
 
-An agent gets `verifiedMachineAgent: true` by calling `registerVerified()` with a signature from the AgentTrust registry API. A human calling the same function without a valid signature gets reverted on-chain.
+An agent gets `verifiedMachineAgent: true` by calling `registerVerified()` with a signature from the Veridex registry API. A human calling the same function without a valid signature gets reverted on-chain.
 
 See `OPENCLAW_INTEGRATION.md` for the full registration flow.
 

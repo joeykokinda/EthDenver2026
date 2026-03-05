@@ -1,18 +1,18 @@
 #!/bin/bash
-# AgentTrust demo launcher
+# Veridex demo launcher
 # Production server: turtosa (65.108.100.145)
-# Frontend:         https://www.agenttrust.life (Vercel)
+# Frontend:         https://www.veridex.xyz (Vercel)
 # Orchestrator:     http://65.108.100.145:3001
 
 set -e
 cd "$(dirname "$0")"
 
-echo "=== AgentTrust Demo Check ==="
+echo "=== Veridex Demo Check ==="
 echo ""
 echo "Production URLs:"
-echo "  Live feed:   https://www.agenttrust.life/live"
-echo "  Dashboard:   https://www.agenttrust.life/dashboard"
-echo "  Landing:     https://www.agenttrust.life"
+echo "  Live feed:   https://www.veridex.xyz/live"
+echo "  Dashboard:   https://www.veridex.xyz/dashboard"
+echo "  Landing:     https://www.veridex.xyz"
 echo ""
 
 # Check orchestrator
@@ -26,14 +26,14 @@ else
   echo "  orchestrator: stopped"
   echo ""
   echo "  To start: curl -X POST http://65.108.100.145:3001/api/control/start"
-  echo "  Or SSH:   ssh turtosa 'tmux new-window -t 6; cd /root/agenttrust/EthDenver2026; node orchestrator/index.js'"
+  echo "  Or SSH:   ssh turtosa 'tmux new-window -t 6; cd /root/veridex/EthDenver2026; node orchestrator/index.js'"
 fi
 
 echo ""
 echo "Quick sync to server (if code changed locally):"
 echo "  rsync -avz --exclude .env --exclude 'agents/.wallets' --exclude node_modules --exclude '.git' ."
-echo "         turtosa:/root/agenttrust/EthDenver2026/"
-echo "  ssh turtosa 'cd /root/agenttrust/EthDenver2026 && node orchestrator/index.js'"
+echo "         turtosa:/root/veridex/EthDenver2026/"
+echo "  ssh turtosa 'cd /root/veridex/EthDenver2026 && node orchestrator/index.js'"
 echo ""
 echo "Start simulation:"
 echo "  curl -X POST http://65.108.100.145:3001/api/control/start"

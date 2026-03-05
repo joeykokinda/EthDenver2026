@@ -78,7 +78,7 @@ function accountLink(addr) {
 
 async function main() {
   console.log("\n" + "=".repeat(60));
-  console.log("AGENTTRUST — FRESH REGISTRATION");
+  console.log("VERIDEX — FRESH REGISTRATION");
   console.log("=".repeat(60));
   console.log("Deployer (registry authority):", deployer.address);
   console.log("OLD contract:", OLD_CONTRACT);

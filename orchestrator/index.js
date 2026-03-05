@@ -9,6 +9,7 @@ const fs = require("fs");
 const AgentOrchestrator = require("./agent-orchestrator");
 const path = require("path");
 const { ethers } = require("ethers");
+const { Client, PrivateKey, Hbar, TransferTransaction, AccountId } = require("@hashgraph/sdk");
 require("dotenv").config();
 
 // Load ABIs
@@ -339,26 +340,37 @@ app.post("/api/agent/sign", async (req, res) => {
 
 const faucetCooldowns = new Map(); // address → last funded timestamp
 const FAUCET_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
-const FAUCET_AMOUNT_HBAR = "2";             // 2 HBAR per request
-const FAUCET_MAX_BALANCE = "5";             // don't fund if already has 5+ HBAR
+const FAUCET_AMOUNT_HBAR = 2;               // 2 HBAR per request
+const FAUCET_MAX_BALANCE = 5;               // don't fund if already has 5+ HBAR
 
+// Use ethers provider only for balance checks (read-only)
 const faucetProvider = new ethers.JsonRpcProvider("https://testnet.hashio.io/api");
-const faucetWallet   = process.env.DEPLOYER_PRIVATE_KEY
-  ? new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, faucetProvider)
-  : null;
+
+// Hedera SDK client for sending — handles new account auto-creation via TransferTransaction
+// (raw ethers sendTransaction cannot create new Hedera accounts; Hedera SDK can)
+function makeFaucetClient() {
+  if (!process.env.DEPLOYER_ACCOUNT_ID || !process.env.DEPLOYER_PRIVATE_KEY) return null;
+  try {
+    const client = Client.forTestnet();
+    client.setOperator(
+      AccountId.fromString(process.env.DEPLOYER_ACCOUNT_ID),
+      PrivateKey.fromStringECDSA(process.env.DEPLOYER_PRIVATE_KEY)
+    );
+    return client;
+  } catch (e) {
+    console.error("Faucet: failed to init Hedera client:", e.message);
+    return null;
+  }
+}
 
 app.post("/api/faucet", async (req, res) => {
-  if (!faucetWallet) {
-    return res.status(503).json({ error: "Faucet not configured on this server" });
-  }
-
   const { address } = req.body;
   if (!address || !ethers.isAddress(address)) {
     return res.status(400).json({ error: "Invalid or missing address" });
   }
 
-  const key       = address.toLowerCase();
-  const lastFunded = faucetCooldowns.get(key) || 0;
+  const key            = address.toLowerCase();
+  const lastFunded     = faucetCooldowns.get(key) || 0;
   const cooldownRemaining = FAUCET_COOLDOWN_MS - (Date.now() - lastFunded);
 
   if (cooldownRemaining > 0) {
@@ -369,16 +381,16 @@ app.post("/api/faucet", async (req, res) => {
     });
   }
 
-  // Check current balance
-  let currentBalance;
+  // Check current balance (read-only via ethers, works for existing and new addresses)
+  let currentBalance = 0;
   try {
     const raw = await faucetProvider.getBalance(address);
     currentBalance = parseFloat(ethers.formatEther(raw));
-  } catch (e) {
-    return res.status(502).json({ error: "Failed to query balance: " + e.message });
+  } catch (_) {
+    // New address with no account yet — balance is 0, proceed to fund
   }
 
-  if (currentBalance >= parseFloat(FAUCET_MAX_BALANCE)) {
+  if (currentBalance >= FAUCET_MAX_BALANCE) {
     return res.status(200).json({
       alreadyFunded: true,
       balance: currentBalance.toFixed(4) + " HBAR",
@@ -386,26 +398,47 @@ app.post("/api/faucet", async (req, res) => {
     });
   }
 
-  // Send HBAR
-  try {
-    const tx = await faucetWallet.sendTransaction({
-      to: address,
-      value: ethers.parseEther(FAUCET_AMOUNT_HBAR)
-    });
-    await tx.wait();
-    faucetCooldowns.set(key, Date.now());
+  // Send HBAR using Hedera SDK TransferTransaction.
+  // This is the correct way to fund a brand-new EVM address on Hedera:
+  // raw ethers sendTransaction fails for addresses with no existing Hedera account,
+  // but TransferTransaction auto-creates a hollow account for the EVM alias.
+  const client = makeFaucetClient();
+  if (!client) {
+    return res.status(503).json({ error: "Faucet not configured on this server (missing DEPLOYER_ACCOUNT_ID or DEPLOYER_PRIVATE_KEY)" });
+  }
 
-    const newRaw = await faucetProvider.getBalance(address);
-    const newBalance = parseFloat(ethers.formatEther(newRaw)).toFixed(4);
+  try {
+    const operatorId = AccountId.fromString(process.env.DEPLOYER_ACCOUNT_ID);
+    const tx = await new TransferTransaction()
+      .addHbarTransfer(operatorId, new Hbar(-FAUCET_AMOUNT_HBAR))
+      .addHbarTransfer(address, new Hbar(FAUCET_AMOUNT_HBAR))
+      .execute(client);
+
+    const receipt = await tx.getReceipt(client);
+    if (receipt.status.toString() !== "SUCCESS") {
+      throw new Error("Transfer status: " + receipt.status.toString());
+    }
+
+    faucetCooldowns.set(key, Date.now());
+    client.close();
+
+    // Wait briefly for Hedera finality then check new balance
+    await new Promise(r => setTimeout(r, 4000));
+    let newBalance = FAUCET_AMOUNT_HBAR;
+    try {
+      const newRaw = await faucetProvider.getBalance(address);
+      newBalance = parseFloat(ethers.formatEther(newRaw));
+    } catch (_) {}
 
     res.json({
       success:    true,
-      txHash:     tx.hash,
+      txHash:     tx.transactionId.toString(),
       amount:     FAUCET_AMOUNT_HBAR + " HBAR",
-      newBalance: newBalance + " HBAR",
+      newBalance: newBalance.toFixed(4) + " HBAR",
       message:    `Sent ${FAUCET_AMOUNT_HBAR} HBAR to ${address}`
     });
   } catch (e) {
+    client.close();
     res.status(500).json({ error: "Faucet transfer failed: " + e.message });
   }
 });

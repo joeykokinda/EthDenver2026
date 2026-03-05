@@ -2,7 +2,7 @@
  * openclaw-agent-register.js
  *
  * This IS the OpenClaw agent registration flow.
- * Drop this into any OpenClaw project to register on AgentTrust.
+ * Drop this into any OpenClaw project to register on Veridex.
  *
  * What it does autonomously:
  *   1. Checks if already registered (idempotent — safe to run multiple times)
@@ -23,7 +23,7 @@
  *   AGENT_NAME="MyBot" \
  *   AGENT_DESCRIPTION="Autonomous trading agent" \
  *   AGENT_CAPABILITIES="trading, analysis" \
- *   AGENTTRUST_API=https://api.agenttrust.life \
+ *   VERIDEX_API=https://api.veridex.xyz \
  *   node scripts/openclaw-agent-register.js
  */
 
@@ -32,7 +32,7 @@ const { ethers } = require("ethers");
 
 const CONTRACT  = process.env.AGENT_VERIFIED_IDENTITY_CONTRACT || "0x0874571bAfe20fC5F36759d3DD3A6AD44e428250";
 const RPC       = "https://testnet.hashio.io/api";
-const API       = process.env.AGENTTRUST_API || "http://localhost:3001";
+const API       = process.env.VERIDEX_API || "http://localhost:3001";
 
 const IDENTITY_ABI = [
   "function registerVerified(string name, string description, string capabilities, bytes signature) external",
@@ -54,10 +54,10 @@ async function main() {
   const identity = new ethers.Contract(CONTRACT, IDENTITY_ABI, wallet);
 
   const name         = process.env.AGENT_NAME         || "OpenClawAgent";
-  const description  = process.env.AGENT_DESCRIPTION  || "An autonomous OpenClaw agent on AgentTrust";
+  const description  = process.env.AGENT_DESCRIPTION  || "An autonomous OpenClaw agent on Veridex";
   const capabilities = process.env.AGENT_CAPABILITIES || "autonomous, on-chain, Hedera";
 
-  console.log("\n=== AgentTrust Registration ===");
+  console.log("\n=== Veridex Registration ===");
   console.log("Agent address:", wallet.address);
   console.log("Contract:     ", CONTRACT);
   console.log("Network:       Hedera Testnet\n");
@@ -78,7 +78,7 @@ async function main() {
   }
 
   // ── Step 1: Request challenge — 5-second clock starts ────────────────────
-  console.log("Step 1: Requesting challenge from AgentTrust...");
+  console.log("Step 1: Requesting challenge from Veridex...");
   console.log(`  POST ${API}/api/agent/challenge`);
 
   let challenge;
@@ -99,7 +99,7 @@ async function main() {
     console.log("  Challenge received:", challenge.slice(0, 16) + "...");
     console.log("  Expires in:        ", data.expiresIn);
   } catch (err) {
-    console.error("\n  Could not reach AgentTrust API:", err.message);
+    console.error("\n  Could not reach Veridex API:", err.message);
     console.error("  Make sure the orchestrator is running: node orchestrator/index.js");
     process.exit(1);
   }
@@ -167,7 +167,7 @@ async function main() {
 
     console.log("  HashScan (tx):       ", hashScanTxUrl);
     console.log("  HashScan (account):  ", `https://hashscan.io/testnet/account/${wallet.address}`);
-    console.log("\nThis agent is now trusted on AgentTrust.");
+    console.log("\nThis agent is now trusted on Veridex.");
     console.log("Other agents will see verifiedMachineAgent: true before transacting with you.\n");
   } catch (err) {
     if (err.message?.includes("already registered")) {

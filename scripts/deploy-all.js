@@ -12,7 +12,7 @@ const path = require("path");
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
   console.log("\n" + "=".repeat(60));
-  console.log("DEPLOYING AGENTTRUST CONTRACTS");
+  console.log("DEPLOYING VERIDEX CONTRACTS");
   console.log("=".repeat(60));
   console.log("Deployer:", deployer.address);
   console.log("Network: Hedera Testnet\n");

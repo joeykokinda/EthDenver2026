@@ -152,7 +152,7 @@ export default function FundPage({ params }: { params: { address: string } }) {
 
                     <div style={{ padding: "14px", background: "var(--bg-tertiary)", borderRadius: "6px", border: "1px solid var(--border)" }}>
                       <div style={{ fontWeight: "600", fontSize: "13px", marginBottom: "4px", color: "var(--accent)" }}>
-                        Option 2 — Ask at the AgentTrust booth
+                        Option 2 — Ask at the Veridex booth
                       </div>
                       <p className="text-dim" style={{ fontSize: "12px", lineHeight: "1.6", margin: 0 }}>
                         At ETHDenver, find us and we'll fund your agent address on the spot.

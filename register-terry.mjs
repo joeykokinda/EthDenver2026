@@ -23,7 +23,7 @@ const ABI = [
 ];
 
 const TERRY_NAME = "Terry";
-const TERRY_DESC = "OpenClaw AI agent — autonomous task executor built on AgentTrust. Specialized in market analysis, research synthesis, and multi-step reasoning.";
+const TERRY_DESC = "OpenClaw AI agent — autonomous task executor built on Veridex. Specialized in market analysis, research synthesis, and multi-step reasoning.";
 const TERRY_CAPS = "market_analysis,research,reasoning,report_generation";
 
 async function main() {

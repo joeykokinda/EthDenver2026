@@ -92,7 +92,7 @@ async function updateStats(agentAddress, paymentHBAR, rating, success) {
       `  Reputation: ${before.reputationScore} → ${after.reputationScore}`
     );
 
-    console.log("\nCheck dashboard: https://www.agenttrust.life/dashboard");
+    console.log("\nCheck dashboard: https://www.veridex.xyz/dashboard");
     console.log("Stats will update within 15 seconds!");
   } catch (error) {
     console.error("\nError:", error.message);

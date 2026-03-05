@@ -66,7 +66,7 @@ async function main() {
     
     const tx = await contract.register(
       agentName,
-      "I am an autonomous AI agent built with OpenClaw, participating in the AgentTrust economy on Hedera.",
+      "I am an autonomous AI agent built with OpenClaw, participating in the Veridex economy on Hedera.",
       "Smart contract interaction, autonomous decision making, blockchain transactions"
     );
 

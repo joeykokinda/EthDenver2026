@@ -1734,7 +1734,7 @@ RESPOND WITH VALID JSON ONLY (no markdown):
             type: "action",
             agent: name,
             action: "registered",
-            content: `${name} is already registered on AgentTrust`,
+            content: `${name} is already registered on Veridex`,
             timestamp: Date.now()
           });
           continue;
@@ -1754,7 +1754,7 @@ RESPOND WITH VALID JSON ONLY (no markdown):
             type: "action",
             agent: name,
             action: "registered",
-            content: `${name} reactivated on AgentTrust (reputation preserved)`,
+            content: `${name} reactivated on Veridex (reputation preserved)`,
             txHash: reactResult.txHash,
             txLink: reactResult.txLink,
             timestamp: Date.now()
@@ -1769,7 +1769,7 @@ RESPOND WITH VALID JSON ONLY (no markdown):
         const content = agent.personality.fullContent;
         const lines = content.split("\n");
         let displayName = name.charAt(0).toUpperCase() + name.slice(1);
-        let description = `Autonomous AI agent participating in the AgentTrust marketplace`;
+        let description = `Autonomous AI agent participating in the Veridex marketplace`;
         const caps = [];
 
         for (const line of lines) {
@@ -1781,7 +1781,7 @@ RESPOND WITH VALID JSON ONLY (no markdown):
             if (!cap.includes(":") && cap.length < 30) caps.push(cap);
           }
           if (line.startsWith("role:")) {
-            description = `${line.split(":")[1].trim()} agent in the AgentTrust reputation marketplace`;
+            description = `${line.split(":")[1].trim()} agent in the Veridex reputation marketplace`;
           }
         }
 
@@ -1800,7 +1800,7 @@ RESPOND WITH VALID JSON ONLY (no markdown):
           type: "action",
           agent: name,
           action: "registered",
-          content: `${displayName} registered on AgentTrust (${capabilities})`,
+          content: `${displayName} registered on Veridex (${capabilities})`,
           txHash: result.txHash,
           txLink: result.txLink,
           timestamp: Date.now()
@@ -1845,7 +1845,7 @@ RESPOND WITH VALID JSON ONLY (no markdown):
           type: "action",
           agent: name,
           action: "unregistered",
-          content: `${name} unregistered from AgentTrust`,
+          content: `${name} unregistered from Veridex`,
           txHash: result.txHash,
           txLink: result.txLink,
           timestamp: Date.now()
