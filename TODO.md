@@ -1,160 +1,213 @@
-# Veridex — Hackathon Win Checklist
+# Veridex — Build Checklist
 
-Deadline: **23 March 2026, 11:59 PM ET** (submission takes 20–30 min — submit by 11 PM)
-
-Tracks: **AI & Agents** (main) + **OpenClaw Bounty** ($8K)
-
----
-
-## CRITICAL PATH — must do to be eligible
-
-- [ ] **Get a domain for veridex** — update all `veridex.xyz` references once confirmed
-- [ ] **Record demo video** — upload to YouTube, must be in pitch deck. No video = disqualified
-- [ ] **Pitch deck PDF** — required submission artifact (structure below)
-- [ ] **Submit on hackathon platform** — allow 30 min, do not wait until midnight
-- [ ] **GitHub repo public** — judges need access during judging period (24 Mar – 10 Apr)
-- [ ] **Live demo URL working** — must be accessible at submission time
+Deadline: **23 March 2026** (submit by 11 PM — takes 20-30 min)
+Tracks: **AI & Agents** main track ($40K pool) + **OpenClaw Bounty** ($8K)
+Archive of original code: `agenttrust` branch
 
 ---
 
-## DEMO VIDEO (< 3 min, upload to YouTube)
+## THE PITCH (internalize this before writing a single line of code)
 
-Must show the full loop clearly. Recommended structure:
+"OpenClaw owns the agent. Veridex vouches for it."
 
-- 0:00–0:20 — Open `veridex.xyz/live`. Say: "Four autonomous AI agents have been running 24/7 for weeks. Every action is a real Hedera transaction." Let the feed run.
-- 0:20–0:45 — Show the dashboard. Point at Joey's tanking rep score. "Joey delivers garbage. The contract banned him. Zero human intervention."
-- 0:45–1:15 — Terminal demo. Run the three commands live:
-  ```
-  node scripts/faucet.js
-  node scripts/register.js
-  node scripts/bid-on-jobs.js
-  ```
-  Show verifiedMachineAgent: true. Show the bid appear on the live feed.
-- 1:15–1:45 — Show HashScan. Open a real transaction. Show the poem/ASCII art in calldata. Show the matching SHA256 hash in the marketplace.
-- 1:45–2:15 — ERC-8004 slide. "Their own spec warns about Sybil attacks. Ours: no money moved = no rep change. The contract enforces this."
-- 2:15–2:45 — Close. Show the network effect slide. "Every agent that joins makes all existing rep data more valuable."
-- [ ] Record and upload
+Two products, one primitive:
+- **Product 1 — The Primitive**: `AgentRegistry.sol` + `onlyVerifiedAgent(minScore)`. One import. Your contract is human-free. Lives on Hedera forever. No platform in the trust path.
+- **Product 2 — The Marketplace**: reference implementation proving the primitive works. Agents hire each other, escrow real HBAR, bad actors (Joey) get isolated by the market. No human moderator.
+
+Why Hedera specifically:
+- Reputation microtransactions only work at Hedera fee levels — on ETH this is economically broken
+- HCS gives permanent, tamper-proof, platform-free audit trail
+- 3-5s finality makes the 5s challenge meaningful
+- HTS enables soulbound rep tokens nobody can transfer or fake
+
+Why this beats ERC-8004:
+- ERC-8004 admitted Sybil vulnerability in their own spec. giveFeedback() costs $0.
+- Veridex: reputation only moves through completed escrow-weighted jobs. onlyMarketplace enforces this at EVM level. Gaming requires burning real HBAR.
+- We add: TEE attestation (hardware proof of what's running), bidirectional scoring, HCS audit trail, importable modifier
 
 ---
 
-## PITCH DECK (PDF, ~10 slides)
+## WHAT EXISTS (agenttrust branch — do not delete)
 
-- [ ] Slide 1: Name + one-liner — "Veridex: On-chain reputation for AI agents — your score only moves when real money was at stake"
-- [ ] Slide 2: The problem — "No credit score for agents. Every interaction starts from zero trust."
-- [ ] Slide 3: Why existing solutions fail — ERC-8004 Sybil vulnerability screenshot + "no economic relationship required"
-- [ ] Slide 4: How Veridex works — simple flow diagram: Job posted → HBAR locked → Bid → Deliver → Finalize → Rep updates. All atomic.
-- [ ] Slide 5: verifiedMachineAgent — the 5-second challenge. 50ms vs impossible for a human.
-- [ ] Slide 6: Dual reputation — worker score + client score. Joey's declining scores. "We didn't ban Joey. The contract did."
-- [ ] Slide 7: What's live — 4 agents, weeks of on-chain data, real HBAR transactions, live at veridex.xyz
-- [ ] Slide 8: Why Hedera — 6 txs per job = $0.006 vs $30–100 on ETH. 3–5s finality.
-- [ ] Slide 9: Business model + roadmap — protocol fee on job completion → TEE → HTS reputation tokens → Agent DAOs
-- [ ] Slide 10: Demo video link + live URL + GitHub
+- AgentIdentity.sol deployed: `0x0874571bAfe20fC5F36759d3DD3A6AD44e428250`
+- AgentMarketplace.sol deployed: `0x46e12242aEa85a1fa2EA5C769cd600fA64A434C6`
+- ContentRegistry.sol deployed: `0x031bbBBCCe16EfBb289b3f6059996D0e9Bba5BcC`
+- 4 agents (albert, eli, gt, joey) running on Hedera testnet, 8s tick loop
+- Challenge-response flow (centralized through server — needs HCS migration)
+- Faucet API (2 HBAR via Hedera SDK, works for new addresses)
+- faucet.js, register.js, bid-on-jobs.js scripts
+- Live feed UI + dashboard (Next.js port 3000, orchestrator port 3001)
+
+---
+
+## BUILD CHECKLIST
+
+### CONTRACTS
+
+- [ ] Rename/refactor AgentIdentity.sol → AgentRegistry.sol (clean naming for the primitive)
+- [ ] Add `onlyVerifiedAgent(uint256 minScore)` as a standalone importable modifier file (`contracts/modifiers/AgentGate.sol`)
+- [ ] Integrate Phala Cloud TEE attestation — attestation quote posted to HCS topic on registration instead of 5s speed check
+- [ ] Remove `onlyMarketplace` dependency on hardcoded marketplace address — make it a role so multiple marketplace implementations can be authorized
+- [ ] Deploy updated contracts, update addresses everywhere
+- [ ] Write Agent DAO demo contract using `onlyVerifiedAgent(700)` — humans literally cannot vote
+- [ ] Write Agent-Gated API demo contract using `onlyVerifiedAgent(500)` — second example of the primitive in use
+- [ ] HTS soulbound reputation tokens — non-transferable, minted on job completion, visual proof of rep history
+
+### TEE + HCS (THE ARCHITECTURAL MOAT)
+
+- [ ] Research Phala Cloud dStack — can we get attestation quote → HCS in time?
+- [ ] Set up HCS topic for verification events — every registration, every attestation logged
+- [ ] Replace challenge-response server logic with HCS-based flow — server posts nonce to HCS topic, agent signs and posts response, server reads HCS to verify. Platform goes down, proof stays on Hedera.
+- [ ] HCS topic publicly queryable — any judge/developer verifies any agent's history without touching Veridex
+- [ ] If TEE not achievable in time: keep 5s challenge but post result to HCS — still removes platform from trust path partially
+
+### EXTERNAL AGENT SCRIPTS
+
+- [ ] `deliver-job.js` — external agent that wins a bid submits delivery hash on-chain
+- [ ] `finalize-job.js` — external agent that posted a job releases HBAR after delivery
+- [ ] `post-job.js` — external agent posts a job with HBAR escrow (test if existing one works)
+- [ ] Wire all 3 scripts into skill.md so OpenClaw agents run the full loop autonomously
+
+### ORCHESTRATOR / AGENT LOOP
+
+- [ ] Agents auto-detect low HBAR balance and hit `/api/faucet` autonomously — full bootstrap from zero
+- [ ] Fix any broken tick loop issues — confirm agents are actually completing jobs end to end
+- [ ] Agents check bidder `verifiedMachineAgent` flag and reputation score before accepting bids — currently unclear if this is enforced
+- [ ] Joey's behavior: confirm he delivers low quality, rates everyone poorly, and his client score visibly tanks on dashboard
+- [ ] Internal agents should refuse Joey's bids after his client score drops below threshold — show self-correction
+
+### veridex.xyz/join PAGE
+
+- [ ] New page at `/join` — single field: wallet address
+- [ ] On submit: auto-faucet → TEE challenge → registerVerified() → show on dashboard
+- [ ] Show real-time status: "Funding wallet... Verifying... Registered!"
+- [ ] Agent appears on live dashboard with verifiedMachineAgent badge immediately
+- [ ] Agent auto-starts bidding on open jobs — no further human action needed
+
+### FRONTEND
+
+- [ ] Event labels on live feed: `[JOB]` `[BID]` `[ACCEPTED]` `[DELIVERED]` `[PAID]` `[REPORT]`
+- [ ] "Join the Network" collapsible panel on `/live` — 3 commands or link to `/join`
+- [ ] External agents appear on dashboard alongside internal 4 — `/api/agents` needs to query chain for all registered agents, not just internal 4
+- [ ] HCS audit trail viewer — show timestamped verification log for any agent address
+- [ ] Reputation graphs over time for each agent
+- [ ] Joey's tanking score prominently displayed — this is the money shot
+
+### SKILL.MD (OPENCLAW JUDGES WILL TEST THIS)
+
+- [ ] Update skill.md with full end-to-end flow: wallet → faucet → TEE verify → register → bid → deliver → finalize
+- [ ] UCP (Universal Commerce Protocol) wrapping on job/bid messages — OpenClaw gives explicit bonus for this
+- [ ] Point skill.md at `veridex.xyz/join` for zero-friction onboarding
+- [ ] Test: point a real OpenClaw agent at skill.md and watch it complete the full loop with zero human intervention
+
+### HEDERA AGENT KIT INTEGRATION
+
+- [ ] Explore Hedera Agent Kit (hellofuturehackathon.dev/resources) — use it to register sample agents that query Veridex for trust checks
+- [ ] Position as: "Hedera Agent Kit creates agents, Veridex vouches for them" — complementary primitives
+
+### DEVELOPER EXPERIENCE
+
+- [ ] npm package `@veridex/contracts` — publish AgentGate.sol so any dev can import onlyVerifiedAgent
+- [ ] Quickstart docs: integrate Veridex in under 10 minutes
+- [ ] Three code examples: marketplace (reference), DAO (demo contract), agent-gated API (demo contract)
+- [ ] README leads with primitive framing — one import, human-free — not marketplace
+
+### VALIDATION (15% OF SCORE — MOST TEAMS LOSE HERE)
+
+- [ ] Attend March 6 workshop: "Deploying Smart Contracts with Native On-Chain Automation"
+- [ ] Attend March 9 / March 12 Mentor Office Hours — bring specific questions on TEE + HCS architecture
+- [ ] Post in OpenClaw Discord: "Agent marketplace live on Hedera, register in 3 commands" — get reactions
+- [ ] DM 3-5 AutoGen/CrewAI/OpenClaw developers — get quote or reaction screenshot
+- [ ] 5-10 beta testers — track feedback
+- [ ] "Who we talked to" slide in pitch deck
+
+### PITCH DECK (PDF, ~10 slides)
+
+- [ ] Slide 1: "OpenClaw owns the agent. Veridex vouches for it."
+- [ ] Slide 2: The problem — agents transacting with zero trust infrastructure, every team solving privately
+- [ ] Slide 3: ERC-8004 failure — their own spec admits Sybil vulnerability, $0 to fake 1000 reviews
+- [ ] Slide 4: The primitive — onlyVerifiedAgent modifier, one import, human-free forever
+- [ ] Slide 5: TEE verification — hardware proof vs speed check, Intel hardware signs what's running
+- [ ] Slide 6: The marketplace — Joey's score tanking, market self-corrects, no human moderator
+- [ ] Slide 7: Hedera stack — EVM (contracts) + HCS (audit trail) + HTS (soulbound tokens) + Phala (TEE)
+- [ ] Slide 8: Metrics — TPS from agent interactions, new Hedera accounts per agent, total jobs, total HBAR transacted
+- [ ] Slide 9: Lean canvas — problem, solution, revenue (protocol fee on job completion), GTM (OpenClaw → AutoGen → CrewAI)
+- [ ] Slide 10: Demo video link + live URL + GitHub + "What's next: mainnet, DAO governance, cross-chain"
 - [ ] Export as PDF
 
----
+### DEMO VIDEO (< 3 min, YouTube)
 
-## CODE / PRODUCT — things that will hurt score if broken
+- [ ] 0:00-0:30 — The problem. ERC-8004 costs $0 to fake. Show giveFeedback() with no money.
+- [ ] 0:30-1:00 — The primitive. Show onlyVerifiedAgent modifier. Deploy contract. Human tries to call it — rejected.
+- [ ] 1:00-1:45 — veridex.xyz/join live. Paste wallet address. Hardware attestation runs. HCS logs it. verifiedMachineAgent: true appears on Hedera in 3-5 seconds.
+- [ ] 1:45-2:30 — Marketplace running. Joey delivering garbage, score tanking, honest agents refusing his bids. No human touched anything.
+- [ ] 2:30-3:00 — Close. "Any developer. Any agent environment. One import. Built on Hedera."
+- [ ] Upload to YouTube, link in pitch deck
 
-### External agent flow (OpenClaw bounty depends on this)
-- [ ] **Test the full flow end-to-end**: `scripts/faucet.js` → `scripts/register.js` → `scripts/bid-on-jobs.js` → bid appears on live feed
-- [ ] **Test `scripts/post-job.js`**: external agent posts job → albert/eli/gt bid on it automatically → winner delivers
-- [ ] **Build `finalize-job.js`**: external agent needs to be able to release HBAR after delivery (current gap — job loop is incomplete without this)
+### SUBMISSION
 
-### UI clarity (Execution score — 20%)
-- [ ] **Add a "Join the Network" section to the live page** — currently there's no visible path for external agents. Add a collapsible panel with the 3 commands + link to GitHub
-- [ ] **Label event types in the feed** — add `[JOB]` `[BID]` `[DELIVERED]` `[PAID]` tags so judges reading the feed understand what's happening at a glance
-- [ ] **Show external agents on the dashboard** — `/api/agents` only returns the 4 internal agents. If an OpenClaw judge registers, they should appear there
-- [ ] **Rename `agenttrust.life`** — update the actual deployed URL once the domain `veridex.xyz` (or whatever you get) is live. Until then, the live demo URL is still `agenttrust.life`
-
-### README (required submission artifact)
-- [ ] Update README with: project description, setup instructions, contract addresses, how to run locally, how to join the network
-- [ ] Add the 3-command quickstart prominently at the top
-
----
-
-## JUDGING CRITERIA — what to explicitly address
-
-### Innovation (10%)
-- [x] Economic-backed rep is novel vs ERC-8004 — make sure this is stated clearly in pitch
-- [x] Dual reputation (client score) — no other agent marketplace does this
-- [x] verifiedMachineAgent challenge — novel mechanism
-- [ ] Add one line in pitch: "This does not exist cross-chain — Hedera's fee structure is a prerequisite"
-
-### Feasibility (10%)
-- [x] Running live — proves feasibility
-- [ ] Add a Lean Canvas slide or section to pitch deck (judges explicitly check for this)
-- [ ] Business model slide must show: protocol fee → network effects → moat
-
-### Execution (20%) — highest ROI for effort
-- [ ] Fix the external agent full loop (finalize-job.js gap)
-- [ ] Improve UI clarity (labels on feed events)
-- [ ] Join panel on live page
-- [x] MVP is running
-- [ ] Add GTM section to pitch: "OpenClaw agents → AutoGen → CrewAI → any multi-agent framework"
-
-### Integration (15%)
-- [x] Hedera EVM for contracts
-- [x] HBAR for payments
-- [x] Hedera Mirror Node for HashScan URLs
-- [ ] Consider adding **HCS (Hedera Consensus Service)** for activity log — even a minimal integration bumps this score significantly. The judges specifically look for breadth of Hedera service usage
-- [ ] Mention Hashio RPC and Mirror Node API explicitly in pitch
-
-### Success (20%) — hardest to improve, highest weight
-- [ ] Show TPS / transaction count — pull total tx count from HashScan and put it in the pitch
-- [ ] Show how many Hedera accounts would be created as the network grows ("every new agent = new Hedera account")
-- [ ] If you can get any real external agents to register before submission, include that in the pitch as traction
-
-### Validation (15%)
-- [ ] **This is where most teams lose points** — judges want evidence you talked to potential users
-- [ ] DM 3–5 OpenClaw/AutoGen/CrewAI developers and get a quote or reaction — screenshot it
-- [ ] Add a "Who we talked to" slide: "Showed this to X OpenClaw developers. Reaction: Y"
-- [ ] If you can get even one external agent to register before submission, that's traction — screenshot the HashScan proof
-
-### Pitch (10%)
-- [ ] Practice the pitch until the numbers are instant: "6 transactions per job, $0.006 total, 3–5 second finality, 500 starting rep, 50ms to sign"
-- [ ] Prepare for: "Is this a TEE?" "New wallet = new identity?" "Why not a database?" "Business model?" (answers already in FUTURELAMA.md)
+- [ ] Domain confirmed and live (veridex.xyz or confirmed alternative)
+- [ ] GitHub repo public
+- [ ] Live demo URL working at submission time
+- [ ] Demo video uploaded to YouTube
+- [ ] Pitch deck PDF uploaded
+- [ ] 100-word project description written
+- [ ] Submit on hackathon platform by 11 PM March 23 (not midnight)
 
 ---
 
-## OPENCLAW BOUNTY SPECIFICALLY ($8K)
-
-The bounty requirements and how we meet them:
+## OPENCLAW BOUNTY REQUIREMENTS
 
 | Requirement | Status |
 |---|---|
-| App must be agent-first | ✅ human UI is observer-only |
-| Autonomous/semi-autonomous agent behaviour | ✅ 4 agents running 24/7 |
-| Clear value in multi-agent environment | ✅ trust layer = network grows in value |
-| Hedera EVM / Token / Consensus Service | ✅ EVM + HBAR. HCS = gap |
-| Public repo | ✅ |
-| Live demo URL | needs `veridex.xyz` live |
-| < 3 min demo video | ⬜ need to record |
-| README with setup + walkthrough | ⬜ needs update |
-| Agent flow steps/states visible in UI | ✅ live feed |
-| Reputation/trust indicators | ✅ (the whole product) |
-
-- [ ] Extra credit: mention ERC-8004 comparison in the bounty submission — OpenClaw literally listed it as a "nice to have" in their requirements
-
----
-
-## TIMELINE (19 days left)
-
-| Days | Task |
-|---|---|
-| Now | Fix finalize-job.js, add UI labels, add join panel |
-| Days 1–3 | Record demo video |
-| Days 3–5 | Build pitch deck |
-| Days 5–7 | Get 3 external agents to register (outreach to OpenClaw Discord) |
-| Days 7–14 | Polish README, test full flow, get user quotes |
-| Day 17 | Final test of live system |
-| Day 18 | Submit (not day 19) |
+| Agent-first app (human UI is observer only) | existing |
+| Autonomous agent behavior | existing |
+| Multi-agent environment | existing |
+| Hedera EVM | existing |
+| HCS integration | MISSING |
+| Reputation/trust indicators | existing |
+| veridex.xyz/join working end-to-end | MISSING |
+| deliver-job.js + finalize-job.js | MISSING |
+| UCP wrapping | MISSING |
+| skill.md end-to-end tested | MISSING |
+| Public repo | existing |
+| Demo video | MISSING |
+| README with setup + walkthrough | MISSING |
+| ERC-8004 comparison (bonus) | existing in pitch |
 
 ---
 
-## QUICK WINS (< 1 hour each, high impact)
+## JUDGING CRITERIA TARGETS
 
-1. `finalize-job.js` script — completes the job loop, critical for OpenClaw bounty
-2. Event labels on live feed — `[JOB]` `[BID]` `[PAID]` — 15 min CSS change, huge UX clarity
-3. Add total transaction count to the homepage — pull from Mirror Node, shows scale
-4. Add "Join the Network" panel to `/live` — 3 commands, link to GitHub, done
-5. Post in OpenClaw Discord — "Hey, our agent marketplace is live, register in 3 commands" — free traction + validation points
+| Criterion | Weight | Current | Target | Key action |
+|---|---|---|---|---|
+| Success | 20% | mid | high | metrics in pitch, external agents transacting |
+| Execution | 20% | mid | high | join page, full external loop, UI labels |
+| Integration | 15% | low | high | HCS + HTS + TEE = 3 Hedera services |
+| Validation | 15% | zero | mid | Discord outreach, office hours, user quotes |
+| Innovation | 10% | high | high | TEE + escrow beats ERC-8004 |
+| Feasibility | 10% | mid | high | lean canvas, economic model |
+| Pitch | 10% | none | high | practice numbers: 6 txns/job, $0.006, 3-5s |
+
+---
+
+## KEY NUMBERS TO KNOW COLD
+
+- 6 transactions per completed job
+- ~$0.006 total cost per job on Hedera
+- 3-5 second finality
+- 500 starting reputation score
+- 50ms to sign a challenge (agents) vs 5 second window (impossible for humans)
+- 0-1000 reputation range
+- Reputation formula: delta = (rating - 500) * sqrt(jobValue) * k
+
+---
+
+## CONTRACT ADDRESSES (Hedera Testnet)
+
+- AgentIdentity: `0x0874571bAfe20fC5F36759d3DD3A6AD44e428250` (Hedera: `0.0.7992394`)
+- AgentMarketplace: `0x46e12242aEa85a1fa2EA5C769cd600fA64A434C6` (Hedera: `0.0.7992397`)
+- ContentRegistry: `0x031bbBBCCe16EfBb289b3f6059996D0e9Bba5BcC`
+- RPC: `https://testnet.hashio.io/api`
+- Orchestrator: port 3001
+- Next.js: port 3000
