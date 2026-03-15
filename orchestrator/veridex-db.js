@@ -88,6 +88,8 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_alerts_agent_id ON alerts(agent_id);
     CREATE INDEX IF NOT EXISTS idx_policies_agent_id ON policies(agent_id);
   `);
+  // Migrations — safe to run repeatedly
+  try { db.exec("ALTER TABLE agents ADD COLUMN config TEXT"); } catch {}
 }
 
 // ── Agents ────────────────────────────────────────────────────────────────────
@@ -263,6 +265,27 @@ function getAgentEarnings(agentId) {
   return getDb().prepare("SELECT * FROM earnings WHERE agent_id = ? ORDER BY timestamp DESC").all(agentId);
 }
 
+// ── Split config ───────────────────────────────────────────────────────────────
+
+const DEFAULT_SPLIT = { splitDev: 60, splitOps: 30, splitReinvest: 10 };
+
+function getAgentSplitConfig(agentId) {
+  const agent = getAgent(agentId);
+  if (!agent?.config) return DEFAULT_SPLIT;
+  try {
+    const cfg = JSON.parse(agent.config);
+    return { ...DEFAULT_SPLIT, ...cfg };
+  } catch { return DEFAULT_SPLIT; }
+}
+
+function setAgentSplitConfig(agentId, { splitDev, splitOps, splitReinvest }) {
+  const current = getAgent(agentId);
+  let existing = {};
+  try { existing = JSON.parse(current?.config || "{}"); } catch {}
+  const next = JSON.stringify({ ...existing, splitDev, splitOps, splitReinvest });
+  getDb().prepare("UPDATE agents SET config = ? WHERE id = ?").run(next, agentId);
+}
+
 module.exports = {
   getDb,
   // agents
@@ -274,5 +297,7 @@ module.exports = {
   // policies
   insertPolicy, getAgentPolicies, deletePolicy,
   // earnings
-  insertEarning, getAgentEarnings
+  insertEarning, getAgentEarnings,
+  // split config
+  getAgentSplitConfig, setAgentSplitConfig
 };

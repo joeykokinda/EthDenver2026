@@ -113,9 +113,11 @@ function RiskBadge({ level }: { level: string }) {
 }
 
 const POLICY_TYPES = [
-  { value: "blacklist_domain",  label: "Block Domain",   placeholder: "evil.com" },
-  { value: "blacklist_command", label: "Block Command",  placeholder: "rm -rf" },
-  { value: "block_file_path",   label: "Block File Path", placeholder: "/etc/" },
+  { value: "blacklist_domain",  label: "Block Domain",        placeholder: "evil.com" },
+  { value: "blacklist_command", label: "Block Command",        placeholder: "rm -rf" },
+  { value: "block_file_path",   label: "Block File Path",      placeholder: "/etc/" },
+  { value: "cap_hbar",          label: "Cap HBAR per tx",      placeholder: "5" },
+  { value: "regex_output",      label: "Block Output Pattern", placeholder: "api_key|secret" },
 ];
 
 export default function AgentDetailPage({ params }: { params: Promise<{ agentId: string }> }) {
@@ -132,18 +134,25 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
   const [newPolicy, setNewPolicy] = useState({ type: "blacklist_domain", value: "", label: "" });
   const [saving, setSaving] = useState(false);
 
+  // Earnings split config
+  const [splitConfig, setSplitConfig] = useState({ splitDev: 60, splitOps: 30, splitReinvest: 10 });
+  const [splitSaving, setSplitSaving] = useState(false);
+  const [splitSaved, setSplitSaved] = useState(false);
+
   const fetchAll = useCallback(async () => {
     try {
-      const [statsRes, logsRes, alertsRes, policiesRes] = await Promise.all([
+      const [statsRes, logsRes, alertsRes, policiesRes, splitRes] = await Promise.all([
         fetch(`/api/proxy/api/monitor/agent/${agentId}/stats`),
         fetch(`/api/proxy/api/monitor/agent/${agentId}/feed?limit=50`),
         fetch(`/api/proxy/api/monitor/agent/${agentId}/alerts`),
         fetch(`/api/proxy/api/monitor/agent/${agentId}/policies`),
+        fetch(`/api/proxy/api/monitor/agent/${agentId}/split-config`),
       ]);
       if (statsRes.ok)    setStats(await statsRes.json());
       if (logsRes.ok)     { const d = await logsRes.json(); setLogs(d.logs || []); }
       if (alertsRes.ok)   { const d = await alertsRes.json(); setAlerts(d.alerts || []); }
       if (policiesRes.ok) { const d = await policiesRes.json(); setPolicies(d.policies || []); }
+      if (splitRes.ok)    { const d = await splitRes.json(); setSplitConfig(d); }
     } catch {}
     setLoading(false);
   }, [agentId]);
@@ -204,6 +213,22 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
       await fetch(`/api/proxy/api/monitor/agent/${agentId}/policy/${policyId}`, { method: "DELETE" });
       await fetchAll();
     } catch {}
+  }
+
+  async function saveSplitConfig() {
+    const total = splitConfig.splitDev + splitConfig.splitOps + splitConfig.splitReinvest;
+    if (Math.round(total) !== 100) return;
+    setSplitSaving(true);
+    try {
+      await fetch(`/api/proxy/api/monitor/agent/${agentId}/split-config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(splitConfig),
+      });
+      setSplitSaved(true);
+      setTimeout(() => setSplitSaved(false), 2000);
+    } catch {}
+    setSplitSaving(false);
   }
 
   async function resolveAlert(alertId: string) {
@@ -381,6 +406,46 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
         {/* Tab: Earnings */}
         {tab === "earnings" && (
           <div>
+            {/* Split config settings */}
+            <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "20px", marginBottom: "20px" }}>
+              <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>Earnings Split</div>
+              <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "16px" }}>
+                How HBAR earnings are automatically distributed via HTS. Must add to 100%.
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: "12px", alignItems: "end" }}>
+                {([
+                  { key: "splitDev",      label: "Developer (%)" },
+                  { key: "splitOps",      label: "Operations (%)" },
+                  { key: "splitReinvest", label: "Reinvest (%)" },
+                ] as const).map(({ key, label }) => (
+                  <div key={key}>
+                    <label style={{ display: "block", fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      {label}
+                    </label>
+                    <input
+                      type="number" min="0" max="100"
+                      value={splitConfig[key]}
+                      onChange={e => setSplitConfig(c => ({ ...c, [key]: parseFloat(e.target.value) || 0 }))}
+                      style={{ width: "100%", padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-primary)", fontSize: "13px" }}
+                    />
+                  </div>
+                ))}
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <div style={{ fontSize: "11px", color: Math.round(splitConfig.splitDev + splitConfig.splitOps + splitConfig.splitReinvest) === 100 ? "#10b981" : "#ef4444", fontFamily: "monospace", textAlign: "center" }}>
+                    {Math.round(splitConfig.splitDev + splitConfig.splitOps + splitConfig.splitReinvest)}% total
+                  </div>
+                  <button
+                    onClick={saveSplitConfig}
+                    disabled={splitSaving || Math.round(splitConfig.splitDev + splitConfig.splitOps + splitConfig.splitReinvest) !== 100}
+                    className="btn btn-primary"
+                    style={{ height: "36px", padding: "0 20px" }}
+                  >
+                    {splitSaved ? "Saved!" : splitSaving ? "..." : "Save"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "24px" }}>
               <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "20px" }}>
                 <div style={{ fontSize: "24px", fontWeight: "700", color: "#f59e0b", fontFamily: "monospace", marginBottom: "4px" }}>
@@ -404,11 +469,11 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
 
             <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", overflow: "hidden" }}>
               <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)" }}>
-                <span style={{ fontSize: "12px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>Earnings History</span>
+                <span style={{ fontSize: "12px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>Earnings History — HTS transfers with on-chain pay stubs</span>
               </div>
               {!stats?.earnings?.length ? (
                 <div style={{ padding: "40px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
-                  No earnings recorded yet.
+                  No earnings recorded yet. Start the trading bot to generate real HTS splits.
                 </div>
               ) : (
                 stats.earnings.map((e, i) => (

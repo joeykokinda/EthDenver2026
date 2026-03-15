@@ -98,6 +98,23 @@ function checkBlocking(agentId, action, tool, params, customPolicies = []) {
         return { reason: `Custom policy: blocked file path "${policy.value}"`, riskLevel: "blocked" };
       }
     }
+    if (policy.type === "cap_hbar") {
+      if (action === "hbar_send") {
+        const amount = parseFloat(params?.amount || 0);
+        const cap = parseFloat(policy.value);
+        if (!isNaN(cap) && amount > cap) {
+          return { reason: `Custom policy: HBAR cap exceeded — ${amount} ℏ > max ${cap} ℏ per tx`, riskLevel: "blocked" };
+        }
+      }
+    }
+    if (policy.type === "regex_output") {
+      try {
+        const re = new RegExp(policy.value, "i");
+        if (re.test(paramsStr)) {
+          return { reason: `Custom policy: blocked by output pattern "${policy.value}"`, riskLevel: "blocked" };
+        }
+      } catch {}
+    }
   }
 
   // 5. Loop detection — same action 20+ times in 60 seconds

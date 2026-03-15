@@ -15,6 +15,7 @@ require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 // Veridex trust layer modules
 const db = require("./veridex-db");
 const { checkBlocking, assessRisk, decodeAction } = require("./blocking");
+const { getAgentSplitConfig, setAgentSplitConfig } = db;
 const { createAgentTopic, writeToHCS, topicHashScanUrl } = require("./hcs-logger");
 const { sendAlert } = require("./telegram");
 
@@ -797,6 +798,61 @@ app.get("/api/monitor/overview", (req, res) => {
   const activeAlerts = d.prepare("SELECT COUNT(*) as c FROM alerts WHERE status = 'active'").get().c;
   const totalHbar    = d.prepare("SELECT COALESCE(SUM(amount_hbar),0) as t FROM earnings").get().t;
   res.json({ totalAgents, logsToday, blockedToday, activeAlerts, totalHbar });
+});
+
+/**
+ * GET /api/monitor/agent/:agentId/split-config
+ * GET current earnings split percentages for an agent.
+ */
+app.get("/api/monitor/agent/:agentId/split-config", (req, res) => {
+  const agent = db.getAgent(req.params.agentId);
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+  res.json(db.getAgentSplitConfig(req.params.agentId));
+});
+
+/**
+ * POST /api/monitor/agent/:agentId/split-config
+ * Save earnings split percentages. Body: { splitDev, splitOps, splitReinvest }
+ * Must add to 100.
+ */
+app.post("/api/monitor/agent/:agentId/split-config", (req, res) => {
+  const { agentId } = req.params;
+  const { splitDev, splitOps, splitReinvest } = req.body;
+  const d = parseFloat(splitDev), o = parseFloat(splitOps), r = parseFloat(splitReinvest);
+  if ([d, o, r].some(n => isNaN(n) || n < 0)) {
+    return res.status(400).json({ error: "splitDev, splitOps, splitReinvest must be non-negative numbers" });
+  }
+  if (Math.round(d + o + r) !== 100) {
+    return res.status(400).json({ error: `Splits must add to 100 (got ${d + o + r})` });
+  }
+  const agent = db.getAgent(agentId);
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+  db.setAgentSplitConfig(agentId, { splitDev: d, splitOps: o, splitReinvest: r });
+  res.json({ success: true, splitDev: d, splitOps: o, splitReinvest: r });
+});
+
+/**
+ * GET /api/leaderboard
+ * All agents sorted by total actions, with stats for leaderboard display.
+ */
+app.get("/api/leaderboard", (req, res) => {
+  const agents = db.getAllAgents();
+  const rows = agents.map(a => {
+    const stats = db.getAgentStats(a.id);
+    return {
+      id: a.id,
+      name: a.name || a.id,
+      owner_wallet: a.owner_wallet,
+      hcs_topic_id: a.hcs_topic_id,
+      hashScanUrl: a.hcs_topic_id ? topicHashScanUrl(a.hcs_topic_id) : null,
+      totalActions: stats.totalActions,
+      blockedActions: stats.blockedActions,
+      totalEarned: stats.totalEarned,
+      activeAlerts: db.getActiveAlertCount(a.id),
+      created_at: a.created_at,
+    };
+  }).sort((a, b) => b.totalActions - a.totalActions);
+  res.json({ agents: rows });
 });
 
 /**

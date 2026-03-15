@@ -107,6 +107,7 @@ export default function Home() {
           <nav className="nav">
             <Link href="/monitor">Monitor</Link>
             <Link href="/dashboard">Agents</Link>
+            <Link href="/leaderboard">Leaderboard</Link>
             <Link href="/live">Marketplace</Link>
             <a href="/skill.md" target="_blank" rel="noopener">skill.md</a>
           </nav>
