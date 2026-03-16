@@ -72,7 +72,7 @@ async function register() {
       body: JSON.stringify({
         agentId: AGENT_ID,
         name: AGENT_NAME,
-        ownerWallet: "0xDEMO0000000000000000000000000000000000001"
+        ownerWallet: "0x53776769f4b9554c51D0852a1Cb11C1eaB4b92AD"
       })
     });
     const data = await resp.json();

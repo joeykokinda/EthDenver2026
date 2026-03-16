@@ -66,7 +66,7 @@ async function register() {
       body: JSON.stringify({
         agentId: AGENT_ID,
         name: AGENT_NAME,
-        ownerWallet: "0xDEMO0000000000000000000000000000000000002"
+        ownerWallet: "0xDA50F7472eC8984F4fAf16BcF6F1f6e0468b896E"
       })
     });
     const data = await resp.json();
@@ -169,7 +169,8 @@ async function doEarningsSplit() {
     splits: { dev: splitDev, ops: splitOps, reinvest: splitReinvest }
   }, "after");
 
-  // Record earning with HCS paystub in DB
+  // Record earning — include txId so backend stamps it as hts_transfer source
+  // Backend will write HCS paystub and update earnings.hcs_paystub_sequence automatically
   try {
     await fetch(`${API_BASE}/api/log`, {
       method: "POST",
@@ -179,7 +180,16 @@ async function doEarningsSplit() {
         sessionId,
         action: "earnings_split",
         tool: "hts_transfer",
-        params: { amount, splitDev, splitOps, splitReinvest, totalEarned, txId, hashScanUrl },
+        params: {
+          amount,
+          splitDev,
+          splitOps,
+          splitReinvest,
+          totalEarned,
+          txId,
+          hashScanUrl,
+          source: txId ? "hts_transfer" : "simulated",
+        },
         phase: "after",
         timestamp: Date.now()
       })

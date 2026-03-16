@@ -550,39 +550,61 @@ app.post("/api/log", async (req, res) => {
     timestamp: timestamp || Date.now()
   });
 
-  // HCS write async
-  if (agentRecord.hcs_topic_id) {
-    writeToHCS(agentRecord.hcs_topic_id, {
-      logId, agentId, action, tool,
-      params: params ? sanitizeParams(params) : null,
-      result: "success", riskLevel: risk, phase,
-      timestamp: timestamp || Date.now()
-    }).then(hcsResult => {
-      if (hcsResult?.sequenceNumber) {
-        // Update log with HCS sequence number
-        try {
-          db.getDb().prepare("UPDATE logs SET hcs_sequence_number = ? WHERE id = ?")
-            .run(hcsResult.sequenceNumber, logId);
-        } catch {}
-      }
-    }).catch(() => {});
-  }
-
-  // Auto-record earnings when trading bot (or any agent) logs an earnings_split
+  // Auto-record earnings NOW (before HCS write) so we have the earningId for the callback
+  let earningId = null;
   if (action === "earnings_split" && phase === "after" && params?.amount) {
     const amountHbar = parseFloat(params.amount);
     if (amountHbar > 0) {
       const splitCfg = db.getAgentSplitConfig(agentId);
-      db.insertEarning({
+      earningId = db.insertEarning({
         agentId,
         amountHbar,
-        source:        params.source || "agent_earnings",
+        source:        params.txId ? "hts_transfer" : (params.source || "agent_earnings"),
         splitDev:      parseFloat(params.splitDev)      || (amountHbar * splitCfg.splitDev / 100),
         splitOps:      parseFloat(params.splitOps)      || (amountHbar * splitCfg.splitOps / 100),
         splitReinvest: parseFloat(params.splitReinvest) || (amountHbar * splitCfg.splitReinvest / 100),
-        hcsPaystubSequence: null, // will be updated when HCS write completes
+        hcsPaystubSequence: params.hcsPaystubSequence || null,
       });
     }
+  }
+
+  // HCS write async — write paystub for earnings_split, normal audit entry for everything else
+  if (agentRecord.hcs_topic_id) {
+    const hcsPayload = action === "earnings_split" && phase === "after"
+      ? {
+          event: "earnings_split",
+          logId, agentId, action, tool,
+          amountHbar: params?.amount,
+          splitDev: params?.splitDev,
+          splitOps: params?.splitOps,
+          splitReinvest: params?.splitReinvest,
+          txId: params?.txId || null,
+          hashScanUrl: params?.hashScanUrl || null,
+          totalEarned: params?.totalEarned || null,
+          timestamp: timestamp || Date.now(),
+        }
+      : {
+          logId, agentId, action, tool,
+          params: params ? sanitizeParams(params) : null,
+          result: "success", riskLevel: risk, phase,
+          timestamp: timestamp || Date.now(),
+        };
+
+    writeToHCS(agentRecord.hcs_topic_id, hcsPayload).then(hcsResult => {
+      if (hcsResult?.sequenceNumber) {
+        try {
+          db.getDb().prepare("UPDATE logs SET hcs_sequence_number = ? WHERE id = ?")
+            .run(hcsResult.sequenceNumber, logId);
+        } catch {}
+        // For earnings_split: stamp the paystub sequence number onto the earnings record
+        if (earningId) {
+          try {
+            db.getDb().prepare("UPDATE earnings SET hcs_paystub_sequence = ? WHERE id = ?")
+              .run(hcsResult.sequenceNumber, earningId);
+          } catch {}
+        }
+      }
+    }).catch(() => {});
   }
 
   // Alert on high risk
