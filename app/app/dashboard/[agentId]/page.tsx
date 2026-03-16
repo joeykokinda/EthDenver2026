@@ -7,27 +7,20 @@ import { use } from "react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface AgentStats {
-  agent: {
-    id: string;
-    name?: string;
-    hcs_topic_id?: string;
-    owner_wallet?: string;
-    created_at: number;
-  };
-  stats: {
-    totalActions: number;
-    actionsToday: number;
-    blockedActions: number;
-    highRiskActions: number;
-    totalEarned: number;
-  };
-  earnings: Earning[];
-  recentAlerts: Alert[];
-  policies: Policy[];
-  recentLogs: Log[];
-  activeAlerts: number;
-  hashScanUrl?: string;
+interface Agent {
+  id: string;
+  name?: string;
+  hcs_topic_id?: string;
+  owner_wallet?: string;
+  created_at: number;
+}
+
+interface Stats {
+  totalActions: number;
+  actionsToday: number;
+  blockedActions: number;
+  highRiskActions: number;
+  totalEarned: number;
 }
 
 interface Log {
@@ -107,11 +100,7 @@ function timeAgo(ts: number) {
 }
 
 const RISK_COLORS: Record<string, string> = {
-  blocked: "#ef4444",
-  high:    "#f97316",
-  medium:  "#f59e0b",
-  low:     "#10b981",
-  info:    "#3b82f6",
+  blocked: "#ef4444", high: "#f97316", medium: "#f59e0b", low: "#10b981", info: "#3b82f6",
 };
 
 function RiskBadge({ level }: { level: string }) {
@@ -132,19 +121,24 @@ const JOB_STATUS_COLORS: Record<string, string> = {
   Completed: "#10b981", Cancelled: "#6b7280", Failed: "#ef4444",
 };
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
 type Tab = "activity" | "jobs" | "earnings" | "policies" | "recovery";
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AgentDetailPage({ params }: { params: Promise<{ agentId: string }> }) {
   const { agentId } = use(params);
   const decodedId = decodeURIComponent(agentId);
 
   const [tab, setTab] = useState<Tab>("activity");
-  const [data, setData] = useState<AgentStats | null>(null);
+  const [agent, setAgent] = useState<Agent | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [earnings, setEarnings] = useState<Earning[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [policies, setPolicies] = useState<Policy[]>([]);
+  const [hashScanUrl, setHashScanUrl] = useState<string | null>(null);
+  const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
   const [liveLogs, setLiveLogs] = useState<Log[]>([]);
-  const liveRef = useRef<EventSource | null>(null);
 
   // Activity filters
   const [riskFilter, setRiskFilter] = useState<string>("all");
@@ -152,7 +146,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
   // Jobs
   const [jobs, setJobs] = useState<Job[]>([]);
 
-  // Policies
+  // Policies form
   const [policyType, setPolicyType] = useState("block_domain");
   const [policyValue, setPolicyValue] = useState("");
   const [policyLabel, setPolicyLabel] = useState("");
@@ -162,14 +156,31 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
   const [memory, setMemory] = useState<AgentMemory | null>(null);
   const [memoryLoading, setMemoryLoading] = useState(false);
 
-  // ─── Fetch base data ────────────────────────────────────────────────────────
+  // ─── Fetch all data in parallel ─────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch(`/api/proxy/api/monitor/agent/${encodeURIComponent(decodedId)}`);
-      if (!res.ok) return;
-      const json = await res.json();
-      setData(json);
+      const [statsRes, logsRes, policiesRes] = await Promise.all([
+        fetch(`/api/proxy/api/monitor/agent/${encodeURIComponent(decodedId)}/stats`),
+        fetch(`/api/proxy/api/monitor/agent/${encodeURIComponent(decodedId)}/feed?limit=100`),
+        fetch(`/api/proxy/api/monitor/agent/${encodeURIComponent(decodedId)}/policies`),
+      ]);
+      if (statsRes.ok) {
+        const d = await statsRes.json();
+        setAgent(d.agent || null);
+        setStats(d.stats || null);
+        setEarnings(d.earnings || []);
+        setAlerts(d.recentAlerts || []);
+        setHashScanUrl(d.hashScanUrl || null);
+      }
+      if (logsRes.ok) {
+        const d = await logsRes.json();
+        setLogs(d.logs || []);
+      }
+      if (policiesRes.ok) {
+        const d = await policiesRes.json();
+        setPolicies(d.policies || []);
+      }
     } catch {}
     setLoading(false);
   }, [decodedId]);
@@ -180,11 +191,10 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
     return () => clearInterval(iv);
   }, [fetchData]);
 
-  // ─── SSE live feed (filter to this agent) ──────────────────────────────────
+  // ─── SSE live feed ────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const es = new EventSource("/api/proxy/feed/live");
-    liveRef.current = es;
     es.onmessage = (e) => {
       try {
         const ev = JSON.parse(e.data);
@@ -193,35 +203,33 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
         }
       } catch {}
     };
-    return () => { es.close(); };
+    return () => es.close();
   }, [decodedId]);
 
   // ─── Fetch jobs ─────────────────────────────────────────────────────────────
 
   const fetchJobs = useCallback(async () => {
-    if (!data?.agent?.owner_wallet) return;
+    if (!agent?.owner_wallet) return;
     try {
-      const res = await fetch(`/api/proxy/v2/jobs/agent/${encodeURIComponent(data.agent.owner_wallet)}`);
+      const res = await fetch(`/api/proxy/v2/jobs/agent/${encodeURIComponent(agent.owner_wallet)}`);
       if (!res.ok) return;
-      const json = await res.json();
-      setJobs(json.jobs || []);
+      const d = await res.json();
+      setJobs(d.jobs || []);
     } catch {}
-  }, [data?.agent?.owner_wallet]);
+  }, [agent?.owner_wallet]);
 
   useEffect(() => {
     if (tab === "jobs") fetchJobs();
   }, [tab, fetchJobs]);
 
-  // ─── Fetch memory ───────────────────────────────────────────────────────────
+  // ─── Fetch memory ─────────────────────────────────────────────────────────────
 
   const fetchMemory = useCallback(async () => {
     if (memory || memoryLoading) return;
     setMemoryLoading(true);
     try {
       const res = await fetch(`/api/proxy/v2/agent/${encodeURIComponent(decodedId)}/memory`);
-      if (!res.ok) return;
-      const json = await res.json();
-      setMemory(json);
+      if (res.ok) setMemory(await res.json());
     } catch {}
     setMemoryLoading(false);
   }, [decodedId, memory, memoryLoading]);
@@ -230,7 +238,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
     if (tab === "recovery") fetchMemory();
   }, [tab, fetchMemory]);
 
-  // ─── Policy actions ─────────────────────────────────────────────────────────
+  // ─── Policy actions ───────────────────────────────────────────────────────────
 
   async function addPolicy() {
     if (!policyValue.trim()) return;
@@ -261,9 +269,9 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
     } catch {}
   }
 
-  // ─── Derived ────────────────────────────────────────────────────────────────
+  // ─── Derived ─────────────────────────────────────────────────────────────────
 
-  const allLogs: Log[] = [...liveLogs, ...(data?.recentLogs || [])].reduce((acc: Log[], l) => {
+  const allLogs: Log[] = [...liveLogs, ...logs].reduce((acc: Log[], l) => {
     if (!acc.find(x => x.id === l.id)) acc.push(l);
     return acc;
   }, []).sort((a, b) => b.timestamp - a.timestamp);
@@ -271,6 +279,12 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
   const filteredLogs = riskFilter === "all" ? allLogs : allLogs.filter(l =>
     riskFilter === "blocked" ? !!l.blockReason : l.riskLevel === riskFilter
   );
+
+  const activeAlerts = alerts.filter(a => a.status !== "resolved");
+  const isLive = liveLogs.length > 0 || (allLogs[0] && Date.now() - allLogs[0].timestamp < 3 * 60 * 1000);
+  const totalEarned = stats?.totalEarned || 0;
+
+  // ─── Loading / not found ─────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -283,7 +297,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
     );
   }
 
-  if (!data) {
+  if (!agent) {
     return (
       <>
         <Nav />
@@ -294,10 +308,6 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
       </>
     );
   }
-
-  const agent = data.agent;
-  const stats = data.stats;
-  const isLive = liveLogs.length > 0 || (allLogs[0] && Date.now() - allLogs[0].timestamp < 3 * 60 * 1000);
 
   return (
     <>
@@ -321,21 +331,20 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
                 {isLive ? "Live" : "Offline"}
               </span>
             </div>
-            {data.activeAlerts > 0 && (
+            {activeAlerts.length > 0 && (
               <span style={{ fontSize: "12px", padding: "2px 10px", borderRadius: "10px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444" }}>
-                {data.activeAlerts} alert{data.activeAlerts !== 1 ? "s" : ""}
+                {activeAlerts.length} alert{activeAlerts.length !== 1 ? "s" : ""}
               </span>
             )}
           </div>
 
-          {/* Stat pills */}
           <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
             {[
-              { label: "Actions today", value: stats.actionsToday, color: "var(--accent)" },
-              { label: "Blocked", value: stats.blockedActions, color: stats.blockedActions > 0 ? "#ef4444" : "var(--text-tertiary)" },
-              { label: "High risk", value: stats.highRiskActions, color: stats.highRiskActions > 0 ? "#f97316" : "var(--text-tertiary)" },
-              { label: "Total", value: stats.totalActions, color: "var(--text-secondary)" },
-              { label: "HBAR earned", value: `${(stats.totalEarned || 0).toFixed(4)} ℏ`, color: "#f59e0b" },
+              { label: "Actions today", value: stats?.actionsToday ?? 0, color: "var(--accent)" },
+              { label: "Blocked", value: stats?.blockedActions ?? 0, color: (stats?.blockedActions ?? 0) > 0 ? "#ef4444" : "var(--text-tertiary)" },
+              { label: "High risk", value: stats?.highRiskActions ?? 0, color: (stats?.highRiskActions ?? 0) > 0 ? "#f97316" : "var(--text-tertiary)" },
+              { label: "Total", value: stats?.totalActions ?? 0, color: "var(--text-secondary)" },
+              { label: "HBAR earned", value: `${totalEarned.toFixed(4)} ℏ`, color: "#f59e0b" },
             ].map(({ label, value, color }) => (
               <div key={label} style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "6px", padding: "6px 12px", display: "flex", gap: "8px", alignItems: "center" }}>
                 <span style={{ fontSize: "14px", fontWeight: 700, fontFamily: "monospace", color }}>{value}</span>
@@ -344,7 +353,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
             ))}
             {agent.hcs_topic_id && (
               <a
-                href={data.hashScanUrl || `https://hashscan.io/testnet/topic/${agent.hcs_topic_id}`}
+                href={hashScanUrl || `https://hashscan.io/testnet/topic/${agent.hcs_topic_id}`}
                 target="_blank" rel="noopener"
                 style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "6px", padding: "6px 12px", fontSize: "12px", color: "var(--accent)", textDecoration: "none", fontFamily: "monospace" }}
               >
@@ -366,8 +375,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
                 borderBottom: tab === t ? "2px solid var(--accent)" : "2px solid transparent",
                 color: tab === t ? "var(--text-primary)" : "var(--text-tertiary)",
                 fontWeight: tab === t ? 600 : 400,
-                textTransform: "capitalize",
-                marginBottom: "-1px",
+                textTransform: "capitalize", marginBottom: "-1px",
                 transition: "color 0.15s",
               }}
             >
@@ -377,24 +385,19 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
                   LIVE
                 </span>
               )}
-              {t === "policies" && (data?.policies?.length || 0) > 0 && (
-                <span style={{ marginLeft: "6px", fontSize: "10px", color: "var(--text-tertiary)" }}>
-                  {data.policies.length}
-                </span>
+              {t === "policies" && policies.length > 0 && (
+                <span style={{ marginLeft: "6px", fontSize: "10px", color: "var(--text-tertiary)" }}>{policies.length}</span>
               )}
-              {t === "earnings" && (data?.earnings?.length || 0) > 0 && (
-                <span style={{ marginLeft: "6px", fontSize: "10px", color: "var(--text-tertiary)" }}>
-                  {data.earnings.length}
-                </span>
+              {t === "earnings" && earnings.length > 0 && (
+                <span style={{ marginLeft: "6px", fontSize: "10px", color: "var(--text-tertiary)" }}>{earnings.length}</span>
               )}
             </button>
           ))}
         </div>
 
-        {/* ── Activity Tab ──────────────────────────────────────────────────── */}
+        {/* ── Activity ───────────────────────────────────────────────────────── */}
         {tab === "activity" && (
           <div>
-            {/* Filter bar */}
             <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
               {["all", "blocked", "high", "medium", "low"].map(f => (
                 <button
@@ -440,13 +443,11 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
                         {log.description || log.action}
                       </div>
                       {log.blockReason && (
-                        <div style={{ fontSize: "12px", color: "#ef4444" }}>
-                          Blocked: {log.blockReason}
-                        </div>
+                        <div style={{ fontSize: "12px", color: "#ef4444" }}>Blocked: {log.blockReason}</div>
                       )}
                     </div>
                     <RiskBadge level={log.blockReason ? "blocked" : log.riskLevel} />
-                    {log.hcsSequenceNumber && (
+                    {log.hcsSequenceNumber ? (
                       <a
                         href={agent.hcs_topic_id ? `https://hashscan.io/testnet/topic/${agent.hcs_topic_id}/messages/${log.hcsSequenceNumber}` : "#"}
                         target="_blank" rel="noopener"
@@ -454,7 +455,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
                       >
                         #{log.hcsSequenceNumber}
                       </a>
-                    )}
+                    ) : <span />}
                   </div>
                 ))}
               </div>
@@ -462,49 +463,32 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
           </div>
         )}
 
-        {/* ── Jobs Tab ──────────────────────────────────────────────────────── */}
+        {/* ── Jobs ───────────────────────────────────────────────────────────── */}
         {tab === "jobs" && (
           <div>
             {jobs.length === 0 ? (
               <div style={{ textAlign: "center", padding: "60px", color: "var(--text-tertiary)", fontSize: "14px" }}>
-                No jobs found for this agent.
+                No ERC-8183 jobs found for this agent.
               </div>
             ) : (
               <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", overflow: "hidden" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 100px 120px auto", gap: "12px", padding: "10px 16px", borderBottom: "1px solid var(--border)", fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  <div>Job ID</div>
-                  <div>Status</div>
-                  <div>Amount</div>
-                  <div>Updated</div>
-                  <div>Tx</div>
+                  <div>Job ID</div><div>Status</div><div>Amount</div><div>Updated</div><div>Tx</div>
                 </div>
                 {jobs.map((job, i) => {
-                  const statusColor = JOB_STATUS_COLORS[job.status] || "#6b7280";
+                  const sc = JOB_STATUS_COLORS[job.status] || "#6b7280";
                   return (
-                    <div
-                      key={job.id}
-                      style={{ display: "grid", gridTemplateColumns: "1fr 120px 100px 120px auto", gap: "12px", padding: "12px 16px", alignItems: "center", borderBottom: i < jobs.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}
-                    >
+                    <div key={job.id} style={{ display: "grid", gridTemplateColumns: "1fr 120px 100px 120px auto", gap: "12px", padding: "12px 16px", alignItems: "center", borderBottom: i < jobs.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                       <div style={{ fontSize: "13px", fontFamily: "monospace", color: "var(--text-primary)" }}>
                         {job.jobId || job.id}
                         {job.description && <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "inherit", marginTop: "2px" }}>{job.description.slice(0, 60)}</div>}
                       </div>
-                      <div>
-                        <span style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "4px", background: `${statusColor}18`, border: `1px solid ${statusColor}40`, color: statusColor }}>
-                          {job.status}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: "13px", fontFamily: "monospace", color: "#f59e0b" }}>
-                        {job.amount ? `${job.amount} ℏ` : "—"}
-                      </div>
-                      <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
-                        {job.updatedAt ? timeAgo(job.updatedAt) : "—"}
-                      </div>
+                      <div><span style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "4px", background: `${sc}18`, border: `1px solid ${sc}40`, color: sc }}>{job.status}</span></div>
+                      <div style={{ fontSize: "13px", fontFamily: "monospace", color: "#f59e0b" }}>{job.amount ? `${job.amount} ℏ` : "—"}</div>
+                      <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>{job.updatedAt ? timeAgo(job.updatedAt) : "—"}</div>
                       <div>
                         {job.txHash ? (
-                          <a href={`https://hashscan.io/testnet/transaction/${job.txHash}`} target="_blank" rel="noopener" style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--accent)" }}>
-                            View ↗
-                          </a>
+                          <a href={`https://hashscan.io/testnet/transaction/${job.txHash}`} target="_blank" rel="noopener" style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--accent)" }}>View ↗</a>
                         ) : <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>—</span>}
                       </div>
                     </div>
@@ -515,15 +499,14 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
           </div>
         )}
 
-        {/* ── Earnings Tab ─────────────────────────────────────────────────── */}
+        {/* ── Earnings ───────────────────────────────────────────────────────── */}
         {tab === "earnings" && (
           <div>
-            {/* Summary cards */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "24px" }}>
               {[
-                { label: "Total Earned", value: `${(stats.totalEarned || 0).toFixed(4)} ℏ`, color: "#f59e0b" },
-                { label: "Payments", value: data.earnings.length, color: "var(--text-primary)" },
-                { label: "Avg Payment", value: data.earnings.length > 0 ? `${(stats.totalEarned / data.earnings.length).toFixed(4)} ℏ` : "—", color: "var(--text-secondary)" },
+                { label: "Total Earned", value: `${totalEarned.toFixed(4)} ℏ`, color: "#f59e0b" },
+                { label: "Payments", value: earnings.length, color: "var(--text-primary)" },
+                { label: "Avg Payment", value: earnings.length > 0 ? `${(totalEarned / earnings.length).toFixed(4)} ℏ` : "—", color: "var(--text-secondary)" },
               ].map(({ label, value, color }) => (
                 <div key={label} style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "20px" }}>
                   <div style={{ fontSize: "22px", fontWeight: 700, fontFamily: "monospace", color, marginBottom: "4px" }}>{value}</div>
@@ -532,24 +515,17 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
               ))}
             </div>
 
-            {data.earnings.length === 0 ? (
+            {earnings.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px", color: "var(--text-tertiary)", fontSize: "14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px" }}>
                 No earnings recorded yet.
               </div>
             ) : (
               <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", overflow: "hidden" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 200px 120px auto", gap: "12px", padding: "10px 16px", borderBottom: "1px solid var(--border)", fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  <div>Source</div>
-                  <div>Amount</div>
-                  <div>Split (dev / ops / reinvest)</div>
-                  <div>When</div>
-                  <div>HCS</div>
+                  <div>Source</div><div>Amount</div><div>Split (dev/ops/reinvest)</div><div>When</div><div>HCS</div>
                 </div>
-                {data.earnings.map((e, i) => (
-                  <div
-                    key={e.id}
-                    style={{ display: "grid", gridTemplateColumns: "1fr 120px 200px 120px auto", gap: "12px", padding: "12px 16px", alignItems: "center", borderBottom: i < data.earnings.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}
-                  >
+                {earnings.map((e, i) => (
+                  <div key={e.id} style={{ display: "grid", gridTemplateColumns: "1fr 120px 200px 120px auto", gap: "12px", padding: "12px 16px", alignItems: "center", borderBottom: i < earnings.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                     <div style={{ fontSize: "13px", color: "var(--text-primary)" }}>{e.source || "unknown"}</div>
                     <div style={{ fontSize: "14px", fontFamily: "monospace", fontWeight: 700, color: "#f59e0b" }}>{e.amount_hbar.toFixed(4)} ℏ</div>
                     <div style={{ fontSize: "12px", fontFamily: "monospace", color: "var(--text-secondary)" }}>
@@ -570,20 +546,15 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
           </div>
         )}
 
-        {/* ── Policies Tab ─────────────────────────────────────────────────── */}
+        {/* ── Policies ───────────────────────────────────────────────────────── */}
         {tab === "policies" && (
           <div>
-            {/* Add policy form */}
             <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "20px", marginBottom: "24px" }}>
               <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "16px" }}>Add Blocking Rule</div>
               <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 1fr auto", gap: "10px", alignItems: "end" }}>
                 <div>
                   <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px" }}>Type</div>
-                  <select
-                    value={policyType}
-                    onChange={e => setPolicyType(e.target.value)}
-                    style={{ width: "100%", padding: "8px 10px", fontSize: "13px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-primary)", cursor: "pointer" }}
-                  >
+                  <select value={policyType} onChange={e => setPolicyType(e.target.value)} style={{ width: "100%", padding: "8px 10px", fontSize: "13px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-primary)", cursor: "pointer" }}>
                     <option value="block_domain">Block Domain</option>
                     <option value="block_path">Block Path</option>
                     <option value="require_approval">Require Approval</option>
@@ -592,91 +563,46 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
                 </div>
                 <div>
                   <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px" }}>Value</div>
-                  <input
-                    type="text"
-                    placeholder="e.g. sketchy-api.com"
-                    value={policyValue}
-                    onChange={e => setPolicyValue(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && addPolicy()}
-                    style={{ width: "100%", padding: "8px 10px", fontSize: "13px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-primary)", fontFamily: "monospace", outline: "none" }}
-                  />
+                  <input type="text" placeholder="e.g. sketchy-api.com" value={policyValue} onChange={e => setPolicyValue(e.target.value)} onKeyDown={e => e.key === "Enter" && addPolicy()} style={{ width: "100%", padding: "8px 10px", fontSize: "13px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-primary)", fontFamily: "monospace", outline: "none" }} />
                 </div>
                 <div>
                   <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px" }}>Label (optional)</div>
-                  <input
-                    type="text"
-                    placeholder="e.g. No sketchy APIs"
-                    value={policyLabel}
-                    onChange={e => setPolicyLabel(e.target.value)}
-                    style={{ width: "100%", padding: "8px 10px", fontSize: "13px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-primary)", fontFamily: "inherit", outline: "none" }}
-                  />
+                  <input type="text" placeholder="e.g. No sketchy APIs" value={policyLabel} onChange={e => setPolicyLabel(e.target.value)} style={{ width: "100%", padding: "8px 10px", fontSize: "13px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-primary)", fontFamily: "inherit", outline: "none" }} />
                 </div>
-                <button
-                  onClick={addPolicy}
-                  disabled={policyLoading || !policyValue.trim()}
-                  style={{ padding: "8px 16px", background: "var(--accent)", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, color: "#000", cursor: "pointer", opacity: policyLoading || !policyValue.trim() ? 0.5 : 1, whiteSpace: "nowrap" }}
-                >
+                <button onClick={addPolicy} disabled={policyLoading || !policyValue.trim()} style={{ padding: "8px 16px", background: "var(--accent)", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, color: "#000", cursor: "pointer", opacity: policyLoading || !policyValue.trim() ? 0.5 : 1, whiteSpace: "nowrap" }}>
                   {policyLoading ? "..." : "Add Rule"}
                 </button>
               </div>
             </div>
 
-            {/* Policies list */}
-            {(data.policies || []).length === 0 ? (
+            {policies.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px", color: "var(--text-tertiary)", fontSize: "14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px" }}>
                 No custom policies. Add rules above to block specific domains or actions.
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {data.policies.map(policy => (
-                  <div
-                    key={policy.id}
-                    style={{ display: "flex", alignItems: "center", gap: "12px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "12px 16px" }}
-                  >
-                    <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.3)", color: "#3b82f6", whiteSpace: "nowrap" }}>
-                      {policy.type}
-                    </span>
-                    <span style={{ fontSize: "13px", fontFamily: "monospace", color: "var(--text-primary)", flex: 1 }}>
-                      {policy.value}
-                    </span>
-                    {policy.label && (
-                      <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>{policy.label}</span>
-                    )}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "32px" }}>
+                {policies.map(policy => (
+                  <div key={policy.id} style={{ display: "flex", alignItems: "center", gap: "12px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "12px 16px" }}>
+                    <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.3)", color: "#3b82f6", whiteSpace: "nowrap" }}>{policy.type}</span>
+                    <span style={{ fontSize: "13px", fontFamily: "monospace", color: "var(--text-primary)", flex: 1 }}>{policy.value}</span>
+                    {policy.label && <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>{policy.label}</span>}
                     <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{timeAgo(policy.created_at)}</span>
-                    <button
-                      onClick={() => deletePolicy(policy.id)}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-tertiary)", fontSize: "18px", lineHeight: 1, padding: "0 4px" }}
-                    >
-                      ×
-                    </button>
+                    <button onClick={() => deletePolicy(policy.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-tertiary)", fontSize: "18px", lineHeight: 1, padding: "0 4px" }}>×</button>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Active alerts */}
-            {data.recentAlerts.filter(a => a.status !== "resolved").length > 0 && (
-              <div style={{ marginTop: "32px" }}>
-                <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "12px", color: "#ef4444" }}>
-                  Active Alerts
-                </div>
+            {activeAlerts.length > 0 && (
+              <div>
+                <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "12px", color: "#ef4444" }}>Active Alerts</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {data.recentAlerts.filter(a => a.status !== "resolved").map(alert => (
-                    <div
-                      key={alert.id}
-                      style={{ display: "flex", alignItems: "center", gap: "12px", background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "8px", padding: "12px 16px" }}
-                    >
-                      <span style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "4px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444", whiteSpace: "nowrap" }}>
-                        {alert.triggerType}
-                      </span>
+                  {activeAlerts.map(alert => (
+                    <div key={alert.id} style={{ display: "flex", alignItems: "center", gap: "12px", background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "8px", padding: "12px 16px" }}>
+                      <span style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "4px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444", whiteSpace: "nowrap" }}>{alert.triggerType}</span>
                       <span style={{ fontSize: "13px", color: "var(--text-primary)", flex: 1 }}>{alert.description}</span>
                       <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{timeAgo(alert.timestamp)}</span>
-                      <button
-                        onClick={() => resolveAlert(alert.id)}
-                        style={{ background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "4px", cursor: "pointer", color: "#ef4444", fontSize: "11px", padding: "3px 8px" }}
-                      >
-                        Resolve
-                      </button>
+                      <button onClick={() => resolveAlert(alert.id)} style={{ background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "4px", cursor: "pointer", color: "#ef4444", fontSize: "11px", padding: "3px 8px" }}>Resolve</button>
                     </div>
                   ))}
                 </div>
@@ -685,7 +611,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
           </div>
         )}
 
-        {/* ── Recovery Tab ─────────────────────────────────────────────────── */}
+        {/* ── Recovery ───────────────────────────────────────────────────────── */}
         {tab === "recovery" && (
           <div>
             <div style={{ marginBottom: "24px" }}>
@@ -696,17 +622,13 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
             </div>
 
             {memoryLoading ? (
-              <div style={{ textAlign: "center", padding: "40px", color: "var(--text-tertiary)", fontSize: "14px" }}>
-                Reading Hedera HCS...
-              </div>
+              <div style={{ textAlign: "center", padding: "40px", color: "var(--text-tertiary)", fontSize: "14px" }}>Reading Hedera HCS...</div>
             ) : !memory ? (
               <div style={{ textAlign: "center", padding: "40px", color: "var(--text-tertiary)", fontSize: "14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px" }}>
                 {agent.hcs_topic_id ? "No HCS messages yet. Start your agent to build history." : "No HCS topic assigned to this agent."}
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-
-                {/* Stats row */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" }}>
                   {[
                     { label: "HCS Messages", value: memory.messageCount, color: "var(--accent)" },
@@ -721,32 +643,20 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
                   ))}
                 </div>
 
-                {/* LLM context summary */}
                 <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "20px" }}>
-                  <div style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px" }}>
-                    Recovery Context (sent to agent on restart)
-                  </div>
+                  <div style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px" }}>Recovery Context (sent to agent on restart)</div>
                   <pre style={{ fontSize: "12px", fontFamily: "monospace", color: "var(--text-secondary)", whiteSpace: "pre-wrap", lineHeight: 1.6, margin: 0 }}>
                     {memory.summary || "No summary available."}
                   </pre>
                 </div>
 
-                {/* Blocked actions */}
                 {memory.blocked_actions.length > 0 && (
                   <div style={{ background: "var(--bg-secondary)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "8px", padding: "20px" }}>
-                    <div style={{ fontSize: "12px", color: "#ef4444", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "12px" }}>
-                      Blocked Actions — Permanently on HCS
-                    </div>
+                    <div style={{ fontSize: "12px", color: "#ef4444", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "12px" }}>Blocked Actions — Permanently on HCS</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       {memory.blocked_actions.map((ba, i) => (
                         <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "12px", fontSize: "13px" }}>
-                          <a
-                            href={agent.hcs_topic_id ? `https://hashscan.io/testnet/topic/${agent.hcs_topic_id}/messages/${ba.seq}` : "#"}
-                            target="_blank" rel="noopener"
-                            style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--accent)", whiteSpace: "nowrap", paddingTop: "1px" }}
-                          >
-                            #{ba.seq}
-                          </a>
+                          <a href={agent.hcs_topic_id ? `https://hashscan.io/testnet/topic/${agent.hcs_topic_id}/messages/${ba.seq}` : "#"} target="_blank" rel="noopener" style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--accent)", whiteSpace: "nowrap", paddingTop: "1px" }}>#{ba.seq}</a>
                           <div>
                             <span style={{ color: "#ef4444" }}>{ba.action}</span>
                             <span style={{ color: "var(--text-tertiary)", marginLeft: "8px" }}>— {ba.reason}</span>
@@ -757,12 +667,9 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
                   </div>
                 )}
 
-                {/* Open jobs */}
                 {memory.open_jobs.length > 0 && (
                   <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "20px" }}>
-                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "12px" }}>
-                      Open Jobs
-                    </div>
+                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "12px" }}>Open Jobs</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       {memory.open_jobs.map((job, i) => {
                         const sc = JOB_STATUS_COLORS[job.status] || "#6b7280";
@@ -778,17 +685,13 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
                   </div>
                 )}
 
-                {/* skill.md integration snippet */}
                 <div style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "20px" }}>
-                  <div style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px" }}>
-                    Add recovery to your agent (Step 0 in skill.md)
-                  </div>
+                  <div style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px" }}>Add to your agent startup (skill.md Step 0)</div>
                   <pre style={{ fontSize: "12px", fontFamily: "monospace", color: "var(--text-secondary)", overflowX: "auto", margin: 0, whiteSpace: "pre-wrap" }}>
-{`// On startup — before any action
-const r = await fetch("https://veridex.sbs/v2/agent/${decodedId}/memory");
+{`const r = await fetch("https://veridex.sbs/v2/agent/${decodedId}/memory");
 const memory = await r.json();
-// memory.summary contains plain-English context for your LLM
-// memory.blocked_actions tells the agent what not to try again`}
+// memory.summary → plain-English LLM context
+// memory.blocked_actions → what not to try again`}
                   </pre>
                 </div>
               </div>

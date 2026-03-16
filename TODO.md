@@ -16,63 +16,58 @@ Deadline: **March 22 2026 EOD** (submit by end of day, March 23 is official cuto
 - [x] RogueBot — runs, blocked actions confirmed on HCS at seq#5 + seq#10
 - [x] `/api/monitor/overview` endpoint — returns live counts
 - [x] SSE `/feed/live` — streams real-time decoded logs
-- [x] Homepage — full Veridex v2 rewrite (old identity/marketplace pitch gone)
-- [x] `/monitor` page — live feed, agent sidebar, risk filters
-- [x] `/monitor/[agentId]` — 4-tab detail (Activity, Earnings, Policies, Alerts) + ERC-8004 reads wired
-- [x] Old pages removed — `scanner`, `events` deleted
-- [x] All navs updated — Monitor · Agents · Marketplace · skill.md
 - [x] `skill.md` — updated with pre/post logging hooks + blocking behavior
-- [x] Frontend build — zero errors, 9 routes
 - [x] README — full project docs rewritten for Veridex v2
-- [x] `veridex.xyz` → `veridex.sbs` everywhere in frontend
+
+### Frontend — all 12 routes building clean
+- [x] `/` — homepage with LiveFeedDemo (SSE), live stats bar, problem/solution sections, install snippet
+- [x] `/dashboard` — wallet-gated agent cards (status dot, last action, stat pills, HCS link); empty state with add prompt; demo mode
+- [x] `/dashboard/add` — 3-step wizard: wallet model → configure (name, ID, split %) → success + code snippet
+- [x] `/dashboard/[agentId]` — 5-tab detail: Activity (live SSE + filter bar), Jobs, Earnings, Policies (add/delete rules + alerts), Recovery (Hedera HCS memory)
+- [x] `/leaderboard` — sortable table, ERC-8004 rep scores from chain, HashScan links
+- [x] Shared `Nav` component — Logo | Dashboard | Leaderboard | Connect Wallet (MetaMask)
+- [x] `WalletProvider` — MetaMask connect/disconnect, localStorage persistence, wallet-gated pages
+
+### Backend — all endpoints live
+- [x] `POST /api/log` — auto-creates agent record if unknown, blocks, logs to HCS
+- [x] `POST /api/agent/register-monitor` — registers agent + creates HCS topic
+- [x] `GET /api/monitor/agents?wallet=` — returns agents by owner wallet
+- [x] `GET /api/monitor/agent/:id/stats` — agent + stats + earnings + alerts
+- [x] `GET /api/monitor/agent/:id/feed` — log history
+- [x] `GET /api/monitor/agent/:id/policies` — blocking rules
+- [x] `POST /api/monitor/agent/:id/policy` + `DELETE` — add/remove rules
+- [x] `GET /api/leaderboard` — all agents sorted by rep
+- [x] `POST /api/monitor/telegram/test` — test alert endpoint (code exists, needs token)
+- [x] `GET /v2/agent/:agentId/memory` — reads Hedera Mirror Node, returns structured recovery context
+- [x] `POST /v2/vault/store` + `/list` + `/request` + `/delete` — encrypted secrets vault
+- [x] `GET /v2/jobs` + `/v2/jobs/agent/:address` — ERC-8183 job monitor
+
+### Layers
+- [x] LAYER 1: Secrets Vault — AES-256-GCM, 60s scoped tokens, never exposes raw secret
+- [x] LAYER 4: ERC-8183 Job Monitor — polls marketplace events, stuck job detection
+- [x] LAYER 5: Earnings — split history, HTS tx links
+- [x] LAYER 8: Verifiable Operational History — HCS-anchored agent memory, crash recovery
 
 ---
 
-## 🟡 BUILT — Not yet tested (quick verify needed)
+## 🟡 NEEDS TESTING — Code exists, not verified in browser
 
-- [ ] **TradingBot** — written, never run. Start it: `node bots/trading-bot.js`
-- [ ] **Real HTS earnings split** — `TransferTransaction` code written in trading-bot, needs live execution to get real tx hash
-- [ ] **ERC-8004 reads in browser** — reads from contract on agent detail page, needs browser verify
-- [ ] **Telegram module** — code correct, no token yet so never fired
-- [ ] **Policies tab** — add/delete blocking rules UI exists, not clicked
-- [ ] **Alerts resolve button** — exists in UI, not clicked
-- [ ] **Register page** — API base changed to relative proxy, not browser-tested
-- [ ] **Dashboard** — nav updated, not browser-refreshed
-
----
-
-## ✅ NEW BUILD — All Complete
-
-### LAYER 1: Secrets Vault ✓
-- [x] `orchestrator/vault.js` — AES-256-GCM encrypted secrets store
-- [x] `POST /v2/vault/store` + `GET /v2/vault/list/:id` + `POST /v2/vault/request` + `DELETE /v2/vault/secret/:id`
-- [x] 60s scoped single-use capability tokens — raw secret never leaves server
-- [x] Grant/denial logged to SQLite + HCS asynchronously
-- [x] `VAULT_ENCRYPTION_KEY` in `.env` and `.env.example`
-- [x] Dashboard Vault tab — store/delete secrets, request tokens, view grant history
-
-### LAYER 4: ERC-8183 Job Monitor ✓
-- [x] `orchestrator/job-monitor.js` — polls marketplace events every 30s
-- [x] Jobs table + full CRUD in `veridex-db.js`
-- [x] Stuck job detection (1hr Funded with no submission = Telegram alert + SSE broadcast)
-- [x] Auto-triggers earnings split on JobFinalized
-- [x] `GET /v2/jobs` + `GET /v2/jobs/agent/:address` endpoints live
-
-### LAYER 5: Earnings ✓
-- [x] Earnings tab — split history, HTS tx links, editable split rules
-- [x] Auto-records earnings when agent logs `earnings_split` action
-- [x] Real HTS tx confirmed: `0.0.7947739@1773626440.359342211`
-
-### LAYER 8: Verifiable Operational History ✓
-- [x] `GET /v2/agent/:agentId/memory` — reads real HCS messages from Hedera Mirror Node
-- [x] Returns structured: `blocked_actions`, `open_jobs`, `recent_completions`, `pending_earnings`, `summary`
-- [x] Rogue bot: 5 real blocked actions verified from Hedera HCS ✓
-- [x] Memory tab in agent detail — summary panel, blocked actions with HCS seq#, open jobs
-- [x] `skill.md` v4.0 — Step 0 memory recovery + Step 1 vault capability request
+- [ ] **Activity tab on /dashboard/[agentId]** — calls `/stats` + `/feed` + `/policies` in parallel; verify data loads correctly
+- [ ] **Recovery tab** — calls `/v2/agent/:id/memory`, reads Mirror Node; verify HCS messages show up
+- [ ] **Add Agent wizard** — 3 steps, register via POST, success screen with HCS topic; step through in browser
+- [ ] **Policies add/delete** — add a domain block, verify it shows in list and actually blocks in `/api/log`
+- [ ] **TradingBot** — written, never run: `node bots/trading-bot.js`
+- [ ] **ERC-8004 reads in leaderboard** — fetches rep scores from chain on load; needs browser verify
+- [ ] **Wallet connect on dashboard** — connect MetaMask → agents filtered by wallet; verify filter works
 
 ---
 
 ## 🔴 TODO — Must complete before submission
+
+### One code fix needed (I do this):
+
+- [ ] **Auto-create HCS topic on first `/api/log`** — currently `POST /api/log` creates the agent DB record but NOT an HCS topic when agent is unknown. This means external agents that skip `/register-monitor` get no audit trail. Fix: when auto-creating, also call `createAgentTopic()` async, same as register-monitor does.
+  - Why it matters: the whole pitch is "install skill, your agent is audited immediately" — if the HCS topic isn't created on first action, that's broken
 
 ### You do these:
 
@@ -85,7 +80,7 @@ Deadline: **March 22 2026 EOD** (submit by end of day, March 23 is official cuto
 
 - [ ] **Confirm rogue bot → Telegram alert hits phone** — the demo WOW moment, must see it before recording
 
-- [ ] **Test trading bot HTS split** — `node bots/trading-bot.js`, wait ~60s, check `/monitor/trading-bot-demo` Earnings tab for real tx hash
+- [ ] **Test trading bot HTS split** — `node bots/trading-bot.js`, wait ~60s, check `/dashboard/trading-bot-demo` Earnings tab for real tx hash
 
 - [ ] **Pitch deck PDF** — 12 slides:
   - 1: Title · 2: Problem (.env secrets in plaintext) · 3: Solution (7-layer control plane) · 4: How it works
@@ -93,13 +88,13 @@ Deadline: **March 22 2026 EOD** (submit by end of day, March 23 is official cuto
   - 7: Verifiable memory demo · 8: Business model · 9: GTM · 10: Roadmap · 11: Team · 12: Close
 
 - [ ] **Demo video** — 5 min, upload to YouTube:
-  1. Open veridex.sbs — agents live, feed ticking
-  2. ResearchBot in /monitor — plain English, HashScan links
-  3. Agent detail — timeline, earnings, HCS pay stub
+  1. Open veridex.sbs — agents live, feed ticking on homepage
+  2. Connect wallet → Dashboard → your agents
+  3. Click ResearchBot — Activity tab live, HashScan links
   4. **RogueBot fires — BLOCKED in red, Telegram alert on phone** 🔥
-  5. Click blocked entry — HashScan proof permanently on Hedera
-  6. Policies tab — add `api.sketchy.com` live
-  7. Kill bots → restart → agent reads memory from Hedera → knows what not to try again
+  5. Click blocked entry → HashScan proof permanently on Hedera
+  6. Policies tab — add `api.sketchy.com` live on camera
+  7. Recovery tab → restart bot → reads memory from Hedera → "knows what not to try again"
   8. Close: *"Every action, forever on Hedera. Tamper-proof. The agent's memory is the blockchain."*
 
 - [ ] **Submit APEX** — hackathon.stackup.dev by March 22 EOD
@@ -113,9 +108,9 @@ Deadline: **March 22 2026 EOD** (submit by end of day, March 23 is official cuto
 ### I do these (say the word):
 
 - [ ] `git commit` everything clean with good messages
-- [ ] Update `.env.example` with new vars (Telegram, DB path, vault encryption key)
-- [ ] Mobile responsive fix on `/monitor` (sidebar breaks on small screens)
-- [ ] Vercel config + deployment setup
+- [ ] Auto-create HCS topic fix in `/api/log` (see above)
+- [ ] Mobile responsive fix — `/dashboard` sidebar breaks on small screens
+- [ ] Vercel deployment setup + env var guide
 
 ---
 
