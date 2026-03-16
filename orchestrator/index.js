@@ -18,6 +18,7 @@ const { checkBlocking, assessRisk, decodeAction } = require("./blocking");
 const { getAgentSplitConfig, setAgentSplitConfig } = db;
 const { createAgentTopic, writeToHCS, topicHashScanUrl } = require("./hcs-logger");
 const { sendAlert } = require("./telegram");
+const telegramBot = require("./telegram-bot");
 const vault = require("./vault");
 const { startJobMonitor, getRecentJobs, getAgentJobs } = require("./job-monitor");
 
@@ -1138,6 +1139,8 @@ const PORT = process.env.ORCHESTRATOR_PORT || 3001;
 app.listen(PORT, () => {
   // Start ERC-8183 job monitor in background
   startJobMonitor(broadcastLiveEvent).catch(e => console.error("[JobMonitor] Start error:", e.message));
+  // Start Telegram bot (polling)
+  telegramBot.start();
   console.log(`\nVeridex Orchestrator running on port ${PORT}`);
   console.log(`\n── Simulation ────────────────────────────────────`);
   console.log(`   GET  /api/activity               - Live activity feed`);

@@ -80,6 +80,10 @@ function checkBlocking(agentId, action, tool, params, customPolicies = []) {
 
   // 4. Custom agent policies
   for (const policy of customPolicies) {
+    // Quarantine — agent blocked via Telegram /block command
+    if (policy.type === "quarantine" && policy.value === "true") {
+      return { reason: "Agent quarantined via Telegram command", riskLevel: "blocked" };
+    }
     if (policy.type === "blacklist_domain") {
       const url = params?.url || params?.endpoint || "";
       if (url.includes(policy.value)) {
