@@ -9,7 +9,7 @@
 const API_BASE = process.env.VERIDEX_API || "http://localhost:3001";
 const AGENT_ID   = "data-bot-demo";
 const AGENT_NAME = "DataBot";
-const OWNER_WALLET = "0x53776769f4b9554c51D0852a1Cb11C1eaB4b92AD"; // ResearchBot wallet
+const OWNER_WALLET = process.env.DATA_BOT_ADDRESS || "0xd9197748A698cF4a7B2FE82cB9AA3ed0aB60759d";
 
 const DB_QUERIES = [
   "SELECT * FROM transactions WHERE date > '2026-01-01' LIMIT 1000",

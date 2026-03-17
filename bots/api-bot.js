@@ -9,7 +9,7 @@
 const API_BASE = process.env.VERIDEX_API || "http://localhost:3001";
 const AGENT_ID   = "api-bot-demo";
 const AGENT_NAME = "APIBot";
-const OWNER_WALLET = "0xDA50F7472eC8984F4fAf16BcF6F1f6e0468b896E"; // TradingBot wallet
+const OWNER_WALLET = process.env.API_BOT_ADDRESS || "0x16f67cDF5F06F832e9B43E067bfb56e3D4250624";
 
 const API_CALLS = [
   { url: "https://api.coingecko.com/api/v3/simple/price", method: "GET",  label: "fetch HBAR price" },

@@ -91,7 +91,7 @@ function AgentCardUI({ agent, recentLogs }: { agent: AgentCard; recentLogs: Log[
       )}
 
       {/* Buttons */}
-      <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+      <div className="agent-card-btns" style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
         <Link href={`/dashboard/${agent.id}`} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "8px", background: "#10b981", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, color: "#000", textDecoration: "none" }}>
           View agent
         </Link>
@@ -208,7 +208,7 @@ export default function DashboardPage() {
         )}
 
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", flexWrap: "wrap", gap: "12px" }}>
+        <div className="dashboard-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", flexWrap: "wrap", gap: "12px" }}>
           <div>
             <h1 style={{ fontSize: "24px", fontWeight: 700, marginBottom: "4px" }}>
               {showDemo ? "Demo Dashboard" : (address ? "Your Agents" : "Dashboard")}
@@ -288,6 +288,12 @@ export default function DashboardPage() {
         )}
 
       </div>
+      <style>{`
+  @media (max-width: 480px) {
+    .dashboard-header { flex-direction: column; align-items: flex-start !important; }
+    .agent-card-btns { flex-direction: column; }
+  }
+`}</style>
     </>
   );
 }

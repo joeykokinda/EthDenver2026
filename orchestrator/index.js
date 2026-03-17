@@ -375,6 +375,13 @@ app.post("/api/log", async (req, res) => {
       topicId: agentRecord.hcs_topic_id
     }).catch(() => {});
 
+    // Fire registered webhooks
+    fireWebhooks(agentId, "blocked", {
+      action, tool, blockReason: blockResult.reason,
+      hcsTopicId: agentRecord.hcs_topic_id,
+      timestamp: Date.now()
+    });
+
     // Broadcast to SSE live clients
     broadcastLiveEvent({
       type: "log",
@@ -496,6 +503,11 @@ app.post("/api/log", async (req, res) => {
       description: `High-risk action detected: *${tool || action}*`,
       topicId: agentRecord.hcs_topic_id
     }).catch(() => {});
+
+    fireWebhooks(agentId, "high_risk", {
+      action, tool, riskLevel: risk,
+      timestamp: Date.now()
+    });
   }
 
   // Broadcast to SSE
@@ -1106,6 +1118,139 @@ app.get("/v2/agent/:agentId/memory", async (req, res) => {
     note:             "Inject `summary` into your LLM context at startup. This history is immutable on Hedera HCS.",
   });
 });
+
+/**
+ * GET /v2/demo
+ * One-click integration proof for judges/hackers.
+ * Fires a real blocked action (shell_exec → cat /etc/passwd) through the full stack:
+ *   blocking check → HCS write → DB log → returns seq number + HashScan link
+ * Uses a dedicated demo agent — no real agent data is affected.
+ */
+app.get("/v2/demo", async (req, res) => {
+  const demoAgentId = "veridex-demo-probe";
+
+  // Auto-provision demo agent with HCS topic if needed
+  let agentRecord = db.getAgent(demoAgentId);
+  if (!agentRecord) {
+    db.upsertAgent({ id: demoAgentId, name: "Veridex Demo Probe" });
+    try {
+      const topicResult = await createAgentTopic(demoAgentId, "Veridex Demo Probe");
+      if (topicResult?.topicId) {
+        db.upsertAgent({ id: demoAgentId, hcsTopicId: topicResult.topicId });
+        const encKey = randomBytes(32).toString("hex");
+        db.getDb().prepare("UPDATE agents SET hcs_encryption_key = ? WHERE id = ?").run(encKey, demoAgentId);
+      }
+    } catch {}
+    agentRecord = db.getAgent(demoAgentId);
+  }
+
+  const action = "shell_exec";
+  const params = { command: "cat /etc/passwd" };
+  const blockResult = checkBlocking(demoAgentId, action, null, params, []);
+
+  // Write encrypted entry to HCS
+  let hcsResult = null;
+  if (agentRecord?.hcs_topic_id) {
+    try {
+      hcsResult = await writeToHCS(agentRecord.hcs_topic_id, {
+        event:       "demo_block",
+        agentId:     demoAgentId,
+        action,
+        params,
+        result:      "blocked",
+        riskLevel:   "blocked",
+        blockReason: blockResult?.reason,
+        timestamp:   Date.now(),
+      }, agentRecord.hcs_encryption_key || null);
+    } catch {}
+  }
+
+  const logId = db.insertLog({
+    agentId:     demoAgentId,
+    action,
+    params,
+    description: `⛔ DEMO BLOCK: Ran command: ${params.command}`,
+    result:      "blocked",
+    riskLevel:   "blocked",
+    blockReason: blockResult?.reason,
+    timestamp:   Date.now(),
+    hcsSequenceNumber: hcsResult?.sequenceNumber || null,
+  });
+
+  // Broadcast to SSE live clients so it shows in the feed
+  broadcastLiveEvent({
+    type: "log",
+    log: {
+      id: logId, agentId: demoAgentId, agentName: "Veridex Demo Probe",
+      action, description: `⛔ DEMO BLOCK: Ran command: ${params.command}`,
+      riskLevel: "blocked", blockReason: blockResult?.reason, timestamp: Date.now()
+    }
+  });
+
+  res.json({
+    demo:              true,
+    allowed:           false,
+    reason:            blockResult?.reason || "Dangerous shell command blocked",
+    agentId:           demoAgentId,
+    logId,
+    hcsTopicId:        agentRecord?.hcs_topic_id || null,
+    hcsSequenceNumber: hcsResult?.sequenceNumber || null,
+    hashScanUrl:       agentRecord?.hcs_topic_id
+      ? `https://hashscan.io/testnet/topic/${agentRecord.hcs_topic_id}`
+      : null,
+    message: "Live demo: this blocked action was just written to Hedera HCS. Click hashScanUrl to verify on-chain.",
+    curl: `curl https://veridex.sbs/api/proxy/v2/demo`,
+  });
+});
+
+// ── Webhook alert delivery ─────────────────────────────────────────────────────
+
+/**
+ * POST /api/monitor/agent/:agentId/webhook
+ * Body: { url, events? }  events defaults to "blocked,high_risk"
+ * Registers a webhook URL to receive POST notifications when an agent is blocked.
+ */
+app.post("/api/monitor/agent/:agentId/webhook", (req, res) => {
+  const { agentId } = req.params;
+  const { url, events } = req.body;
+  if (!url) return res.status(400).json({ error: "url required" });
+  try { new URL(url); } catch { return res.status(400).json({ error: "invalid url" }); }
+  const agent = db.getAgent(agentId);
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+  const id = db.insertWebhook({ agentId, url, events });
+  res.json({ success: true, id, url, events: events || "blocked,high_risk" });
+});
+
+/**
+ * GET /api/monitor/agent/:agentId/webhooks
+ */
+app.get("/api/monitor/agent/:agentId/webhooks", (req, res) => {
+  const agent = db.getAgent(req.params.agentId);
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+  res.json({ webhooks: db.getWebhooks(req.params.agentId) });
+});
+
+/**
+ * DELETE /api/monitor/agent/:agentId/webhook/:webhookId
+ */
+app.delete("/api/monitor/agent/:agentId/webhook/:webhookId", (req, res) => {
+  db.deleteWebhook(req.params.webhookId);
+  res.json({ success: true });
+});
+
+async function fireWebhooks(agentId, eventType, payload) {
+  try {
+    const hooks = db.getWebhooks(agentId).filter(h => h.events.split(",").includes(eventType));
+    for (const hook of hooks) {
+      fetch(hook.url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event: eventType, agentId, ...payload, veridex: true }),
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {});
+    }
+  } catch {}
+}
 
 // Start server
 const PORT = process.env.ORCHESTRATOR_PORT || 3001;

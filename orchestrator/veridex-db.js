@@ -138,6 +138,15 @@ function ensureJobsTable() {
       timestamp   INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
     CREATE INDEX IF NOT EXISTS idx_vault_grants_agent ON vault_grants(agent_id);
+
+    CREATE TABLE IF NOT EXISTS agent_webhooks (
+      id          TEXT PRIMARY KEY,
+      agent_id    TEXT NOT NULL,
+      url         TEXT NOT NULL,
+      events      TEXT NOT NULL DEFAULT 'blocked,high_risk',
+      created_at  INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_webhooks_agent ON agent_webhooks(agent_id);
   `);
 }
 
@@ -430,6 +439,27 @@ function getVaultGrants(agentId) {
   return getDb().prepare("SELECT * FROM vault_grants WHERE agent_id = ? ORDER BY timestamp DESC LIMIT 100").all(agentId);
 }
 
+// ── Agent Webhooks ─────────────────────────────────────────────────────────────
+
+function insertWebhook({ agentId, url, events = "blocked,high_risk" }) {
+  const { randomUUID } = require("crypto");
+  const d = getDb();
+  ensureJobsTable();
+  const id = randomUUID();
+  d.prepare("INSERT INTO agent_webhooks (id, agent_id, url, events) VALUES (?,?,?,?)").run(id, agentId, url, events);
+  return id;
+}
+
+function getWebhooks(agentId) {
+  const d = getDb();
+  ensureJobsTable();
+  return d.prepare("SELECT * FROM agent_webhooks WHERE agent_id = ?").all(agentId);
+}
+
+function deleteWebhook(id) {
+  getDb().prepare("DELETE FROM agent_webhooks WHERE id = ?").run(id);
+}
+
 // ── Agent lookup by wallet ─────────────────────────────────────────────────────
 
 function findAgentByWallet(walletAddress) {
@@ -456,4 +486,6 @@ module.exports = {
   // vault
   insertVaultSecret, getVaultSecret, deleteVaultSecret, getVaultSecrets, findVaultSecret,
   insertVaultGrant, getVaultGrants,
+  // webhooks
+  insertWebhook, getWebhooks, deleteWebhook,
 };

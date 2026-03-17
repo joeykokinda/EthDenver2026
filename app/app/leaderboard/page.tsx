@@ -108,7 +108,7 @@ export default function LeaderboardPage() {
         </div>
 
         {/* Global stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "32px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "16px", marginBottom: "32px" }}>
           {[
             { label: "Agents Monitored", value: agents.length,                         color: "var(--text-primary)" },
             { label: "Total Actions",     value: totalActions.toLocaleString(),         color: "#10b981" },
@@ -153,10 +153,7 @@ export default function LeaderboardPage() {
           ) : (
             <>
               {/* Header row */}
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "40px 1fr 120px 100px 100px 90px 80px",
-                gap: "12px", padding: "10px 20px",
+              <div className="lb-header" style={{
                 borderBottom: "1px solid var(--border)",
                 fontSize: "11px", color: "var(--text-tertiary)",
                 textTransform: "uppercase", letterSpacing: "0.5px",
@@ -165,9 +162,9 @@ export default function LeaderboardPage() {
                 <div>Agent</div>
                 <div style={{ textAlign: "center" }}>Rep Score</div>
                 <div style={{ textAlign: "center" }}>Actions</div>
-                <div style={{ textAlign: "center" }}>Blocked</div>
-                <div style={{ textAlign: "center" }}>Earned</div>
-                <div style={{ textAlign: "center" }}>HCS</div>
+                <div className="lb-col-blocked" style={{ textAlign: "center" }}>Blocked</div>
+                <div className="lb-col-earned" style={{ textAlign: "center" }}>Earned</div>
+                <div className="lb-col-hcs" style={{ textAlign: "center" }}>HCS</div>
               </div>
 
               {agents.map((agent, i) => {
@@ -178,10 +175,8 @@ export default function LeaderboardPage() {
                 return (
                   <div
                     key={agent.id}
+                    className="lb-row"
                     style={{
-                      display: "grid",
-                      gridTemplateColumns: "40px 1fr 120px 100px 100px 90px 80px",
-                      gap: "12px", padding: "14px 20px", alignItems: "center",
                       borderBottom: i < agents.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
                       background: i === 0 ? "rgba(16,185,129,0.03)" : "transparent",
                     }}
@@ -242,17 +237,17 @@ export default function LeaderboardPage() {
                     </div>
 
                     {/* Blocked */}
-                    <div style={{ textAlign: "center", fontSize: "14px", fontFamily: "monospace", color: agent.blockedActions > 0 ? "#ef4444" : "var(--text-tertiary)" }}>
+                    <div className="lb-col-blocked" style={{ textAlign: "center", fontSize: "14px", fontFamily: "monospace", color: agent.blockedActions > 0 ? "#ef4444" : "var(--text-tertiary)" }}>
                       {agent.blockedActions > 0 ? agent.blockedActions : "—"}
                     </div>
 
                     {/* Earned */}
-                    <div style={{ textAlign: "center", fontSize: "13px", fontFamily: "monospace", color: "#f59e0b" }}>
+                    <div className="lb-col-earned" style={{ textAlign: "center", fontSize: "13px", fontFamily: "monospace", color: "#f59e0b" }}>
                       {(agent.totalEarned || 0) > 0 ? `${agent.totalEarned.toFixed(4)} ℏ` : "—"}
                     </div>
 
                     {/* HCS link */}
-                    <div style={{ textAlign: "center" }}>
+                    <div className="lb-col-hcs" style={{ textAlign: "center" }}>
                       {agent.hcs_topic_id ? (
                         <a
                           href={agent.hashScanUrl || "#"}
@@ -280,6 +275,28 @@ export default function LeaderboardPage() {
           on Hedera testnet via ERC-8004.
         </div>
       </div>
+      <style>{`
+  .lb-header, .lb-row {
+    display: grid;
+    grid-template-columns: 40px 1fr 120px 100px 100px 90px 80px;
+    gap: 12px;
+    padding: 10px 20px;
+    align-items: center;
+  }
+  @media (max-width: 768px) {
+    .lb-header, .lb-row {
+      grid-template-columns: 28px 1fr 80px 70px;
+    }
+    .lb-col-blocked, .lb-col-earned, .lb-col-hcs { display: none; }
+  }
+  @media (max-width: 480px) {
+    .lb-header, .lb-row {
+      grid-template-columns: 28px 1fr 70px;
+      padding: 10px 12px;
+    }
+    .lb-col-actions { display: none; }
+  }
+`}</style>
     </>
   );
 }
