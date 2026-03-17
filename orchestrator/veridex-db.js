@@ -90,6 +90,7 @@ function initSchema() {
   `);
   // Migrations — safe to run repeatedly
   try { db.exec("ALTER TABLE agents ADD COLUMN config TEXT"); } catch {}
+  try { db.exec("ALTER TABLE agents ADD COLUMN hcs_encryption_key TEXT"); } catch {}
 }
 
 function ensureJobsTable() {

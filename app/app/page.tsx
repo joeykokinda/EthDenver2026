@@ -15,7 +15,10 @@ function LiveFeedDemo() {
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    const es = new EventSource("/api/proxy/feed/live");
+    // Connect SSE directly to backend URL if available (avoids proxy buffering)
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "";
+    const sseUrl = backendUrl ? `${backendUrl}/feed/live` : "/api/proxy/feed/live";
+    const es = new EventSource(sseUrl);
     esRef.current = es;
     es.onopen = () => setConnected(true);
     es.onerror = () => setConnected(false);
@@ -160,7 +163,15 @@ export default function LandingPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const load = async () => { try { const r = await fetch("/api/proxy/api/monitor/overview"); if (r.ok) setStats(await r.json()); } catch {} };
+    const load = async () => {
+      try {
+        const r = await fetch("/api/proxy/api/monitor/overview");
+        if (r.ok) setStats(await r.json());
+        else setStats({ totalAgents: 0, logsToday: 0, blockedToday: 0, totalHbar: 0 });
+      } catch {
+        setStats({ totalAgents: 0, logsToday: 0, blockedToday: 0, totalHbar: 0 });
+      }
+    };
     load();
     const iv = setInterval(load, 10000);
     return () => clearInterval(iv);
@@ -206,10 +217,10 @@ export default function LandingPage() {
         <section style={{ borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", padding: "28px 24px" }}>
           <div style={{ maxWidth: "900px", margin: "0 auto", display: "flex", gap: "48px", justifyContent: "center", flexWrap: "wrap" }}>
             {[
-              { label: "HCS messages logged", value: stats?.logsToday != null ? stats.logsToday.toLocaleString() : "—" },
-              { label: "Agents monitored",     value: stats?.totalAgents != null ? stats.totalAgents.toLocaleString() : "—" },
-              { label: "Dangerous actions blocked", value: stats?.blockedToday != null ? stats.blockedToday.toLocaleString() : "—" },
-              { label: "HBAR tracked",         value: stats ? `${stats.totalHbar.toFixed(2)} ℏ` : "—" },
+              { label: "HCS messages logged", value: (stats?.logsToday ?? 0).toLocaleString() },
+              { label: "Agents monitored",     value: (stats?.totalAgents ?? 0).toLocaleString() },
+              { label: "Dangerous actions blocked", value: (stats?.blockedToday ?? 0).toLocaleString() },
+              { label: "HBAR tracked",         value: `${(stats?.totalHbar ?? 0).toFixed(2)} ℏ` },
             ].map(s => (
               <div key={s.label} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "30px", fontWeight: 700, fontFamily: "monospace", color: "#10b981" }}>{s.value}</div>

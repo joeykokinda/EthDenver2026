@@ -4,9 +4,37 @@ const ORCHESTRATOR_URL =
   process.env.ORCHESTRATOR_URL || "http://localhost:3001";
 
 async function proxy(request: NextRequest, path: string[]) {
-  // Forward query params
   const url = new URL(request.url);
   const targetUrl = `${ORCHESTRATOR_URL}/${path.join("/")}${url.search}`;
+
+  // SSE passthrough — pipe the stream directly, never buffer
+  const acceptHeader = request.headers.get("accept") || "";
+  if (acceptHeader.includes("text/event-stream")) {
+    try {
+      const upstream = await fetch(targetUrl, {
+        method: "GET",
+        cache: "no-store",
+        headers: { Accept: "text/event-stream" },
+      });
+      // Return the raw readable stream with correct SSE headers
+      return new Response(upstream.body, {
+        status: upstream.status,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    } catch {
+      return new Response("data: {\"error\":\"Orchestrator unreachable\"}\n\n", {
+        status: 503,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    }
+  }
+
+  // Normal JSON proxy
   try {
     const init: RequestInit = {
       method: request.method,

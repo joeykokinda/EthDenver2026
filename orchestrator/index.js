@@ -15,7 +15,8 @@ require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 const db = require("./veridex-db");
 const { checkBlocking, assessRisk, decodeAction } = require("./blocking");
 const { getAgentSplitConfig, setAgentSplitConfig } = db;
-const { createAgentTopic, writeToHCS, topicHashScanUrl } = require("./hcs-logger");
+const { createAgentTopic, writeToHCS, decryptHcsMessage, topicHashScanUrl } = require("./hcs-logger");
+const { randomBytes } = require("crypto");
 const { sendAlert } = require("./telegram");
 const telegramBot = require("./telegram-bot");
 const vault = require("./vault");
@@ -336,7 +337,7 @@ app.post("/api/log", async (req, res) => {
         result: "blocked", riskLevel: "blocked",
         blockReason: blockResult.reason, phase,
         timestamp: timestamp || Date.now()
-      }).then(hcsResult => {
+      }, agentRecord.hcs_encryption_key || null).then(hcsResult => {
         if (hcsResult?.sequenceNumber) {
           db.insertLog({ agentId, sessionId, action, tool, params, description, result: "blocked",
             riskLevel: "blocked", blockReason: blockResult.reason, phase,
@@ -426,7 +427,7 @@ app.post("/api/log", async (req, res) => {
           timestamp: timestamp || Date.now(),
         };
 
-    writeToHCS(agentRecord.hcs_topic_id, hcsPayload).then(hcsResult => {
+    writeToHCS(agentRecord.hcs_topic_id, hcsPayload, agentRecord.hcs_encryption_key || null).then(hcsResult => {
       if (hcsResult?.sequenceNumber) {
         try {
           db.getDb().prepare("UPDATE logs SET hcs_sequence_number = ? WHERE id = ?")
@@ -474,11 +475,23 @@ app.post("/api/log", async (req, res) => {
 });
 
 function sanitizeParams(params) {
-  // Never persist secrets in logs
-  const REDACT = ["password", "secret", "key", "token", "auth", "credential"];
+  // Never persist secrets in logs — two layers:
+  // 1. Redact params whose KEY name suggests a secret
+  // 2. Redact params whose VALUE matches known secret patterns
+  const REDACT_KEYS = ["password", "secret", "key", "token", "auth", "credential", "private", "passwd", "apikey", "api_key"];
+  const SECRET_VALUE_PATTERNS = [
+    /sk_live_[a-zA-Z0-9]+/,
+    /sk_test_[a-zA-Z0-9]+/,
+    /AKIA[0-9A-Z]{16}/,
+    /-----BEGIN.*PRIVATE KEY/,
+    /Bearer\s+[a-zA-Z0-9_\-]{20,}/,
+    /0x[0-9a-fA-F]{64}/,  // 32-byte hex (private keys)
+  ];
   const result = {};
   for (const [k, v] of Object.entries(params)) {
-    if (REDACT.some(r => k.toLowerCase().includes(r))) {
+    if (REDACT_KEYS.some(r => k.toLowerCase().includes(r))) {
+      result[k] = "[REDACTED]";
+    } else if (typeof v === "string" && SECRET_VALUE_PATTERNS.some(p => p.test(v))) {
       result[k] = "[REDACTED]";
     } else if (typeof v === "string" && v.length > 500) {
       result[k] = v.slice(0, 500) + "…";
@@ -517,6 +530,13 @@ app.post("/api/agent/register-monitor", async (req, res) => {
 
   db.upsertAgent({ id: agentId, ownerWallet, hederaAccountId, hcsTopicId, name });
   agentRecord = db.getAgent(agentId);
+
+  // Generate per-agent AES-256 encryption key if not yet assigned
+  if (!agentRecord?.hcs_encryption_key) {
+    const encKey = randomBytes(32).toString("hex");
+    db.getDb().prepare("UPDATE agents SET hcs_encryption_key = ? WHERE id = ?").run(encKey, agentId);
+    agentRecord = db.getAgent(agentId);
+  }
 
   res.json({
     agentId,
@@ -807,7 +827,7 @@ app.post("/v2/vault/request", async (req, res) => {
       reason:     result.reason || null,
       expiresAt:  result.expiresAt || null,
       timestamp:  Date.now(),
-    }).catch(() => {});
+    }, agentRecord.hcs_encryption_key || null).catch(() => {});
   }
 
   if (!result.granted) {
@@ -872,8 +892,19 @@ app.get("/v2/agent/:agentId/memory", async (req, res) => {
         const data = await resp.json();
         hcsMessages = (data.messages || []).map(m => {
           try {
-            const decoded = Buffer.from(m.message, "base64").toString("utf8");
-            const parsed  = JSON.parse(decoded);
+            const rawStr = Buffer.from(m.message, "base64").toString("utf8");
+            let parsed;
+            if (agentRecord.hcs_encryption_key) {
+              try {
+                // Encrypted format (new): decrypt with per-agent key
+                parsed = JSON.parse(decryptHcsMessage(rawStr, agentRecord.hcs_encryption_key));
+              } catch {
+                // Fallback: old unencrypted messages written before encryption was added
+                parsed = JSON.parse(rawStr);
+              }
+            } else {
+              parsed = JSON.parse(rawStr);
+            }
             return {
               sequenceNumber: m.sequence_number,
               consensusTimestamp: m.consensus_timestamp,
