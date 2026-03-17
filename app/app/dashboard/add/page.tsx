@@ -1,16 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Nav } from "../../components/Nav";
 import { useWallet } from "../../lib/wallet";
 
-type WalletModel = "managed" | "byo";
+type AgentType = "openclaw" | "custom";
+
+function slugify(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
 
 interface FormData {
   name: string;
-  agentId: string;
+  hederaAccountId: string;
   telegramChatId: string;
   splitDev: number;
   splitOps: number;
@@ -19,29 +22,44 @@ interface FormData {
 
 const DEFAULT_FORM: FormData = {
   name: "",
-  agentId: "",
+  hederaAccountId: "",
   telegramChatId: "",
   splitDev: 70,
   splitOps: 20,
   splitReinvest: 10,
 };
 
+const INPUT_STYLE = {
+  width: "100%",
+  padding: "10px 12px",
+  fontSize: "14px",
+  color: "var(--text-primary)",
+  background: "var(--bg-tertiary)",
+  border: "1px solid var(--border)",
+  borderRadius: "6px",
+  outline: "none",
+  fontFamily: "inherit",
+  boxSizing: "border-box" as const,
+};
+
 export default function AddAgentPage() {
-  const router = useRouter();
   const { address } = useWallet();
   const [step, setStep] = useState(1);
-  const [walletModel, setWalletModel] = useState<WalletModel>("managed");
+  const [agentType, setAgentType] = useState<AgentType>("openclaw");
   const [form, setForm] = useState<FormData>(DEFAULT_FORM);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ agentId: string; hcsTopicId: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
+  const agentId = slugify(form.name);
   const splitTotal = form.splitDev + form.splitOps + form.splitReinvest;
 
   async function handleRegister() {
     if (!address) { setError("Connect your wallet first."); return; }
-    if (!form.name.trim()) { setError("Agent name is required."); return; }
-    if (!form.agentId.trim()) { setError("Agent ID is required."); return; }
+    if (!form.name.trim()) { setError("Agent nickname is required."); return; }
+    if (!agentId) { setError("Nickname must contain at least one letter or number."); return; }
     if (splitTotal !== 100) { setError("Earnings split must total 100%."); return; }
 
     setLoading(true);
@@ -51,18 +69,19 @@ export default function AddAgentPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          agentId: form.agentId.trim(),
+          agentId,
           agentName: form.name.trim(),
           ownerWallet: address,
           telegramChatId: form.telegramChatId.trim() || undefined,
           splitDev: form.splitDev,
           splitOps: form.splitOps,
           splitReinvest: form.splitReinvest,
+          hederaAccountId: form.hederaAccountId.trim() || undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Registration failed."); setLoading(false); return; }
-      setResult({ agentId: data.agentId || form.agentId, hcsTopicId: data.hcsTopicId || "" });
+      setResult({ agentId: data.agentId || agentId, hcsTopicId: data.hcsTopicId || "" });
       setStep(3);
     } catch (e: any) {
       setError(e.message || "Network error.");
@@ -70,18 +89,24 @@ export default function AddAgentPage() {
     setLoading(false);
   }
 
-  const codeSnippet = result ? `// Add to your agent before any action
-await fetch("https://veridex.sbs/api/log", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    agentId: "${result.agentId}",
-    phase: "before",   // or "after"
-    action: "your_action_name",
-    tool: "tool_name",
-    params: { /* action params */ },
-  }),
-});` : "";
+  function copySnippet(text: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  const skillUrl = result ? `https://veridex.sbs/api/skill?agent=${result.agentId}` : "";
+
+  const openClawSnippet = result
+    ? `// In your OpenClaw config.json\n{\n  "skills": [\n    "${skillUrl}"\n  ]\n}`
+    : "";
+
+  const customSnippet = result
+    ? `// Before every tool call in your agent\nawait fetch("https://veridex.sbs/api/proxy/api/log", {\n  method: "POST",\n  headers: { "Content-Type": "application/json" },\n  body: JSON.stringify({\n    agentId: "${result.agentId}",\n    phase: "before",   // or "after"\n    action: "your_action_name",\n    tool: "tool_name",\n    params: { /* sanitized params */ },\n  }),\n});`
+    : "";
+
+  const snippet = agentType === "openclaw" ? openClawSnippet : customSnippet;
 
   return (
     <>
@@ -91,13 +116,13 @@ await fetch("https://veridex.sbs/api/log", {
         <div style={{ fontSize: "13px", color: "var(--text-tertiary)", marginBottom: "24px" }}>
           <Link href="/dashboard" style={{ color: "var(--text-tertiary)", textDecoration: "none" }}>Dashboard</Link>
           <span style={{ margin: "0 8px" }}>›</span>
-          <span style={{ color: "var(--text-primary)" }}>Add Agent</span>
+          <span style={{ color: "var(--text-primary)" }}>Connect Agent</span>
         </div>
 
         {/* Step indicators */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "36px" }}>
           {[
-            { n: 1, label: "Wallet Model" },
+            { n: 1, label: "Agent Type" },
             { n: 2, label: "Configure" },
             { n: 3, label: "Done" },
           ].map(({ n, label }) => (
@@ -120,48 +145,49 @@ await fetch("https://veridex.sbs/api/log", {
           ))}
         </div>
 
-        {/* Step 1 — Wallet Model */}
+        {/* Step 1 — Agent Type */}
         {step === 1 && (
           <div>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, marginBottom: "8px" }}>Choose a wallet model</h1>
+            <h1 style={{ fontSize: "22px", fontWeight: 700, marginBottom: "8px" }}>Connect your agent</h1>
             <p style={{ color: "var(--text-secondary)", fontSize: "14px", marginBottom: "28px" }}>
-              How will your agent sign transactions?
+              Veridex will monitor every action your agent takes and log it to Hedera HCS — tamper-proof, forever.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "32px" }}>
               {[
                 {
-                  id: "managed" as WalletModel,
-                  title: "Managed Wallet",
+                  id: "openclaw" as AgentType,
+                  title: "OpenClaw agent",
                   badge: "Recommended",
-                  desc: "Veridex creates and manages an encrypted vault for your agent's credentials. Secrets never leave the server — your agent gets scoped capability tokens with 60s TTL.",
-                  pros: ["No key management", "Scoped tokens only", "Auto-rotates on revoke"],
+                  desc: "You have an OpenClaw agent running. Connect it in 30 seconds — Veridex generates a personalized skill URL you paste into your config. No code changes needed.",
+                  pros: ["30-second setup", "Auto-logs every tool call", "Personalized skill URL"],
                 },
                 {
-                  id: "byo" as WalletModel,
-                  title: "Bring Your Own Wallet",
+                  id: "custom" as AgentType,
+                  title: "Custom agent",
                   badge: null,
-                  desc: "Your agent uses its own key. Veridex monitors and audits all actions but does not manage credentials.",
-                  pros: ["Full control", "Works with existing agents", "Any key provider"],
+                  desc: "Using LangChain, CrewAI, AutoGen, or your own agent framework. Add a single HTTP POST before each action and Veridex handles the rest.",
+                  pros: ["Any framework", "Simple REST API", "Same dashboard & alerts"],
                 },
               ].map(({ id, title, badge, desc, pros }) => (
                 <div
                   key={id}
-                  onClick={() => setWalletModel(id)}
+                  onClick={() => setAgentType(id)}
                   style={{
-                    border: `1px solid ${walletModel === id ? "var(--accent)" : "var(--border)"}`,
+                    border: `1px solid ${agentType === id ? "var(--accent)" : "var(--border)"}`,
                     borderRadius: "10px", padding: "20px", cursor: "pointer",
-                    background: walletModel === id ? "var(--accent-dim)" : "var(--bg-secondary)",
+                    background: agentType === id ? "var(--accent-dim)" : "var(--bg-secondary)",
                     transition: "all 0.15s ease",
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
                     <div style={{
                       width: "18px", height: "18px", borderRadius: "50%",
-                      border: `2px solid ${walletModel === id ? "var(--accent)" : "var(--border)"}`,
+                      border: `2px solid ${agentType === id ? "var(--accent)" : "var(--border)"}`,
                       display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
                     }}>
-                      {walletModel === id && <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--accent)" }} />}
+                      {agentType === id && <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--accent)" }} />}
                     </div>
                     <span style={{ fontWeight: 700, fontSize: "15px" }}>{title}</span>
                     {badge && (
@@ -175,7 +201,7 @@ await fetch("https://veridex.sbs/api/log", {
                     )}
                   </div>
                   <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "12px", lineHeight: 1.6 }}>{desc}</p>
-                  <ul style={{ listStyle: "none", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", gap: "12px", flexWrap: "wrap" }}>
                     {pros.map(p => (
                       <li key={p} style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>✓ {p}</li>
                     ))}
@@ -200,14 +226,18 @@ await fetch("https://veridex.sbs/api/log", {
         {/* Step 2 — Configure */}
         {step === 2 && (
           <div>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, marginBottom: "8px" }}>Configure your agent</h1>
+            <h1 style={{ fontSize: "22px", fontWeight: 700, marginBottom: "8px" }}>
+              {agentType === "openclaw" ? "Name your OpenClaw agent" : "Name your agent"}
+            </h1>
             <p style={{ color: "var(--text-secondary)", fontSize: "14px", marginBottom: "28px" }}>
-              Set a name, ID, and how earnings get split.
+              {agentType === "openclaw"
+                ? "Give it a nickname for the dashboard. You'll get a skill URL to paste into your OpenClaw config."
+                : "Give it a nickname for the dashboard. You'll get an API endpoint to call before each action."}
             </p>
 
             {!address && (
               <div style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "6px", padding: "12px 16px", marginBottom: "20px", fontSize: "13px", color: "#f59e0b" }}>
-                Connect your wallet to register an agent.
+                Connect your Hedera wallet to continue.
               </div>
             )}
 
@@ -217,79 +247,103 @@ await fetch("https://veridex.sbs/api/log", {
               </div>
             )}
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px", marginBottom: "32px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px", marginBottom: "28px" }}>
+              {/* Nickname */}
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  Display Name
+                  Agent nickname
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Research Agent Alpha"
+                  placeholder="e.g. ResearchBot, MyTradingAgent"
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  style={{ width: "100%", padding: "10px 12px", fontSize: "14px", color: "var(--text-primary)", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", outline: "none", fontFamily: "inherit" }}
+                  style={INPUT_STYLE}
                 />
+                {form.name && (
+                  <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "6px" }}>
+                    Agent ID: <span style={{ fontFamily: "monospace", color: "var(--text-secondary)" }}>{agentId}</span>
+                  </div>
+                )}
               </div>
 
+              {/* Hedera Account ID */}
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  Agent ID <span style={{ color: "var(--text-tertiary)", textTransform: "none", letterSpacing: 0 }}>(unique slug used in API calls)</span>
+                  Agent&apos;s Hedera account ID <span style={{ color: "var(--text-tertiary)", textTransform: "none", letterSpacing: 0, fontWeight: 400 }}>(optional)</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. research-agent-001"
-                  value={form.agentId}
-                  onChange={e => setForm(f => ({ ...f, agentId: e.target.value.replace(/\s+/g, "-").toLowerCase() }))}
-                  style={{ width: "100%", padding: "10px 12px", fontSize: "14px", color: "var(--text-primary)", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", outline: "none", fontFamily: "monospace" }}
+                  placeholder="e.g. 0.0.8228708"
+                  value={form.hederaAccountId}
+                  onChange={e => setForm(f => ({ ...f, hederaAccountId: e.target.value }))}
+                  style={{ ...INPUT_STYLE, fontFamily: "monospace" }}
                 />
+                <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "6px" }}>
+                  The Hedera account your agent uses to sign transactions. Find it in HashPack or the Hedera Portal.
+                </div>
               </div>
 
+              {/* Telegram */}
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  Telegram Chat ID <span style={{ color: "var(--text-tertiary)", textTransform: "none", letterSpacing: 0 }}>(optional — for alerts)</span>
+                  Telegram chat ID <span style={{ color: "var(--text-tertiary)", textTransform: "none", letterSpacing: 0, fontWeight: 400 }}>(optional — for blocked-action alerts)</span>
                 </label>
                 <input
                   type="text"
                   placeholder="e.g. -100123456789"
                   value={form.telegramChatId}
                   onChange={e => setForm(f => ({ ...f, telegramChatId: e.target.value }))}
-                  style={{ width: "100%", padding: "10px 12px", fontSize: "14px", color: "var(--text-primary)", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", outline: "none", fontFamily: "monospace" }}
+                  style={{ ...INPUT_STYLE, fontFamily: "monospace" }}
                 />
               </div>
 
-              {/* Earnings split */}
+              {/* Advanced: Earnings Split */}
               <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  Earnings Split
-                  <span style={{
-                    marginLeft: "8px", fontSize: "11px", padding: "2px 6px", borderRadius: "4px",
-                    background: splitTotal === 100 ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
-                    color: splitTotal === 100 ? "var(--accent)" : "#ef4444",
-                    border: `1px solid ${splitTotal === 100 ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)"}`,
-                  }}>
-                    {splitTotal}/100
-                  </span>
-                </label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
-                  {[
-                    { key: "splitDev" as keyof FormData, label: "Developer", color: "#10b981" },
-                    { key: "splitOps" as keyof FormData, label: "Operations", color: "#3b82f6" },
-                    { key: "splitReinvest" as keyof FormData, label: "Reinvest", color: "#f59e0b" },
-                  ].map(({ key, label, color }) => (
-                    <div key={key}>
-                      <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px" }}>{label}</div>
-                      <div style={{ position: "relative" }}>
-                        <input
-                          type="number" min={0} max={100}
-                          value={form[key] as number}
-                          onChange={e => setForm(f => ({ ...f, [key]: Number(e.target.value) }))}
-                          style={{ width: "100%", padding: "8px 28px 8px 10px", fontSize: "15px", fontWeight: 700, color, background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", outline: "none", fontFamily: "monospace" }}
-                        />
-                        <span style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "var(--text-tertiary)" }}>%</span>
-                      </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(v => !v)}
+                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--text-tertiary)", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}
+                >
+                  <span style={{ display: "inline-block", transform: showAdvanced ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>›</span>
+                  Advanced — earnings split
+                </button>
+
+                {showAdvanced && (
+                  <div style={{ marginTop: "16px", padding: "16px", background: "var(--bg-secondary)", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "12px" }}>
+                      How HBAR earnings get distributed. Must total 100%.
+                      <span style={{
+                        marginLeft: "8px", fontSize: "11px", padding: "2px 6px", borderRadius: "4px",
+                        background: splitTotal === 100 ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
+                        color: splitTotal === 100 ? "var(--accent)" : "#ef4444",
+                        border: `1px solid ${splitTotal === 100 ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)"}`,
+                      }}>
+                        {splitTotal}/100
+                      </span>
                     </div>
-                  ))}
-                </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                      {[
+                        { key: "splitDev" as keyof FormData, label: "Developer", color: "#10b981" },
+                        { key: "splitOps" as keyof FormData, label: "Operations", color: "#3b82f6" },
+                        { key: "splitReinvest" as keyof FormData, label: "Reinvest", color: "#f59e0b" },
+                      ].map(({ key, label, color }) => (
+                        <div key={key}>
+                          <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px" }}>{label}</div>
+                          <div style={{ position: "relative" }}>
+                            <input
+                              type="number" min={0} max={100}
+                              value={form[key] as number}
+                              onChange={e => setForm(f => ({ ...f, [key]: Number(e.target.value) }))}
+                              style={{ width: "100%", padding: "8px 28px 8px 10px", fontSize: "15px", fontWeight: 700, color, background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", outline: "none", fontFamily: "monospace", boxSizing: "border-box" }}
+                            />
+                            <span style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "var(--text-tertiary)" }}>%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -310,7 +364,7 @@ await fetch("https://veridex.sbs/api/log", {
                   opacity: (loading || !address || splitTotal !== 100) ? 0.6 : 1,
                 }}
               >
-                {loading ? "Registering..." : "Register Agent"}
+                {loading ? "Connecting..." : "Connect agent"}
               </button>
             </div>
           </div>
@@ -320,25 +374,36 @@ await fetch("https://veridex.sbs/api/log", {
         {step === 3 && result && (
           <div>
             <div style={{ textAlign: "center", marginBottom: "32px" }}>
-              <div style={{ fontSize: "48px", marginBottom: "16px" }}>✓</div>
-              <h1 style={{ fontSize: "22px", fontWeight: 700, marginBottom: "8px", color: "var(--accent)" }}>Agent registered</h1>
+              <div style={{
+                width: "56px", height: "56px", borderRadius: "50%",
+                background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.4)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                margin: "0 auto 16px",
+                fontSize: "24px",
+              }}>✓</div>
+              <h1 style={{ fontSize: "22px", fontWeight: 700, marginBottom: "8px", color: "var(--accent)" }}>
+                Agent connected
+              </h1>
               <p style={{ color: "var(--text-secondary)", fontSize: "14px" }}>
-                Your agent is live on Hedera. Add these lines to log every action.
+                {agentType === "openclaw"
+                  ? "Paste this into your OpenClaw config and restart. Logs will appear within 30 seconds."
+                  : "Add this call before every action in your agent. Logs appear in real time."}
               </p>
             </div>
 
+            {/* Info cards */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "24px" }}>
               <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px" }}>
                 <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Agent ID</div>
                 <div style={{ fontSize: "14px", fontFamily: "monospace", color: "var(--text-primary)" }}>{result.agentId}</div>
               </div>
               <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px" }}>
-                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>HCS Topic</div>
+                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>HCS Audit Topic</div>
                 {result.hcsTopicId ? (
                   <a
                     href={`https://hashscan.io/testnet/topic/${result.hcsTopicId}`}
-                    target="_blank" rel="noopener"
-                    style={{ fontSize: "14px", fontFamily: "monospace", color: "var(--accent)" }}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: "14px", fontFamily: "monospace", color: "var(--accent)", textDecoration: "none" }}
                   >
                     {result.hcsTopicId} ↗
                   </a>
@@ -348,12 +413,29 @@ await fetch("https://veridex.sbs/api/log", {
               </div>
             </div>
 
+            {/* Snippet */}
             <div style={{ marginBottom: "24px" }}>
-              <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Add to your agent</div>
-              <pre style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", padding: "16px", fontSize: "12px", fontFamily: "monospace", color: "var(--text-secondary)", overflowX: "auto", whiteSpace: "pre-wrap" }}>
-                {codeSnippet}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                <div style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  {agentType === "openclaw" ? "Add to OpenClaw config" : "Add to your agent"}
+                </div>
+                <button
+                  onClick={() => copySnippet(snippet)}
+                  style={{ background: "none", border: "1px solid var(--border)", borderRadius: "4px", padding: "3px 10px", fontSize: "12px", color: copied ? "var(--accent)" : "var(--text-tertiary)", cursor: "pointer" }}
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+              <pre style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", padding: "16px", fontSize: "12px", fontFamily: "monospace", color: "var(--text-secondary)", overflowX: "auto", whiteSpace: "pre-wrap", margin: 0 }}>
+                {snippet}
               </pre>
             </div>
+
+            {agentType === "openclaw" && (
+              <div style={{ background: "rgba(16,185,129,0.05)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "8px", padding: "14px 16px", marginBottom: "24px", fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                <strong style={{ color: "var(--text-primary)" }}>That&apos;s it.</strong> OpenClaw will fetch your personalized skill and pre-fill your agent ID in every log call. Restart OpenClaw and the first action will appear in your dashboard.
+              </div>
+            )}
 
             <div style={{ display: "flex", gap: "12px" }}>
               <Link
@@ -365,7 +447,7 @@ await fetch("https://veridex.sbs/api/log", {
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}
               >
-                View Agent →
+                View dashboard →
               </Link>
               <Link
                 href="/dashboard"
@@ -376,7 +458,7 @@ await fetch("https://veridex.sbs/api/log", {
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}
               >
-                Dashboard
+                All agents
               </Link>
             </div>
           </div>

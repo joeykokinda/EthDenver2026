@@ -53,7 +53,7 @@ export function Nav() {
               disabled={isConnecting}
               style={{ background: "#10b981", border: "none", borderRadius: "6px", padding: "8px 16px", fontSize: "14px", fontWeight: 600, color: "#000", cursor: "pointer", opacity: isConnecting ? 0.7 : 1 }}
             >
-              {isConnecting ? "Connecting..." : "Connect Wallet"}
+              {isConnecting ? "Connecting..." : "Connect Hedera Wallet"}
             </button>
           )}
         </div>
