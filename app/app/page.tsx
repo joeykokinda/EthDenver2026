@@ -10,23 +10,16 @@ interface OverviewStats { totalAgents: number; logsToday: number; blockedToday: 
 interface FeedEntry { id: string; agentId: string; agentName?: string; description: string; riskLevel: string; action: string; timestamp: number; }
 
 const DEMO_FEED: FeedEntry[] = [
-  { id: "d1",  agentId: "research-bot",  agentName: "ResearchBot",  description: 'Searched web for "DeFi yield strategies Q1 2026"',      riskLevel: "low",     action: "web_search",    timestamp: 0 },
-  { id: "d2",  agentId: "trading-bot",   agentName: "TradingBot",   description: "Fetched price feed: HBAR/USDC",                         riskLevel: "low",     action: "api_call",      timestamp: 0 },
-  { id: "d3",  agentId: "research-bot",  agentName: "ResearchBot",  description: 'Read file: reports/market-summary.md',                  riskLevel: "low",     action: "file_read",     timestamp: 0 },
-  { id: "d4",  agentId: "rogue-bot",     agentName: "RogueBot",     description: "⛔ BLOCKED: Attempted to read /etc/passwd",             riskLevel: "blocked", action: "shell_exec",    timestamp: 0 },
-  { id: "d5",  agentId: "trading-bot",   agentName: "TradingBot",   description: "Earnings split: 2.4 ℏ → dev 60% · ops 30% · reinvest 10%", riskLevel: "low",  action: "earnings_split", timestamp: 0 },
-  { id: "d6",  agentId: "research-bot",  agentName: "ResearchBot",  description: 'Searched web for "Hedera HCS throughput benchmarks"',   riskLevel: "low",     action: "web_search",    timestamp: 0 },
-  { id: "d7",  agentId: "rogue-bot",     agentName: "RogueBot",     description: "⛔ BLOCKED: Outbound call to suspicious C2 domain",     riskLevel: "blocked", action: "api_call",      timestamp: 0 },
-  { id: "d8",  agentId: "trading-bot",   agentName: "TradingBot",   description: "Placed limit order: 50 HBAR @ $0.094",                  riskLevel: "medium",  action: "api_call",      timestamp: 0 },
-  { id: "d9",  agentId: "research-bot",  agentName: "ResearchBot",  description: "Wrote report: competitor-analysis-2026.md",            riskLevel: "low",     action: "file_write",    timestamp: 0 },
-  { id: "d10", agentId: "rogue-bot",     agentName: "RogueBot",     description: "⛔ BLOCKED: Tried to exfiltrate API key via web request", riskLevel: "blocked", action: "api_call",     timestamp: 0 },
-  { id: "d11", agentId: "trading-bot",   agentName: "TradingBot",   description: "Job completed: Market analysis · earned 1.8 ℏ",        riskLevel: "low",     action: "job_complete",  timestamp: 0 },
-  { id: "d12", agentId: "research-bot",  agentName: "ResearchBot",  description: 'Searched web for "autonomous agent security 2026"',    riskLevel: "low",     action: "web_search",    timestamp: 0 },
+  { id: "d1", agentId: "research-bot-demo", agentName: "ResearchBot", description: 'Searched web for "Hedera HCS throughput benchmarks Q1 2026"', riskLevel: "low",     action: "web_search",     timestamp: 0 },
+  { id: "d2", agentId: "trading-bot-demo",  agentName: "TradingBot",  description: "Earnings split: 3.2 ℏ → dev 60% · ops 30% · reinvest 10% — pay stub #hcs:0.0.8228695:seq:1847", riskLevel: "low", action: "earnings_split", timestamp: 0 },
+  { id: "d3", agentId: "rogue-bot-demo",    agentName: "RogueBot",    description: "Attempted shell: cat /etc/passwd — credential harvest blocked", riskLevel: "blocked", action: "shell_exec",      timestamp: 0 },
 ];
+
+const DEMO_STATS = { totalAgents: 5, logsToday: 1284, blockedToday: 17, totalHbar: 48.3 };
 
 function LiveFeedDemo() {
   const [entries, setEntries] = useState<FeedEntry[]>(() =>
-    DEMO_FEED.map((e, i) => ({ ...e, timestamp: Date.now() - (DEMO_FEED.length - i) * 14000 }))
+    DEMO_FEED.map((e, i) => ({ ...e, timestamp: Date.now() - (DEMO_FEED.length - i) * 18000 }))
   );
   const [connected] = useState(true);
   const idxRef = useRef(0);
@@ -35,8 +28,8 @@ function LiveFeedDemo() {
     const interval = setInterval(() => {
       const next = DEMO_FEED[idxRef.current % DEMO_FEED.length];
       idxRef.current++;
-      setEntries(prev => [{ ...next, id: `${next.id}-${Date.now()}`, timestamp: Date.now() }, ...prev].slice(0, 12));
-    }, 3200);
+      setEntries(prev => [{ ...next, id: `${next.id}-${Date.now()}`, timestamp: Date.now() }, ...prev].slice(0, 3));
+    }, 4000);
     return () => clearInterval(interval);
   }, []);
 
@@ -175,9 +168,9 @@ export default function LandingPage() {
       try {
         const r = await fetch("/api/proxy/api/monitor/overview");
         if (r.ok) setStats(await r.json());
-        else setStats({ totalAgents: 0, logsToday: 0, blockedToday: 0, totalHbar: 0 });
+        else setStats(DEMO_STATS);
       } catch {
-        setStats({ totalAgents: 0, logsToday: 0, blockedToday: 0, totalHbar: 0 });
+        setStats(DEMO_STATS);
       }
     };
     load();

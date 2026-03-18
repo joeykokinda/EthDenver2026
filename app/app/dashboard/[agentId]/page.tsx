@@ -13,6 +13,7 @@ interface Agent {
   hcs_topic_id?: string;
   owner_wallet?: string;
   created_at: number;
+  telegram_chat_id?: string;
 }
 
 interface Stats {
@@ -121,7 +122,22 @@ const JOB_STATUS_COLORS: Record<string, string> = {
   Completed: "#10b981", Cancelled: "#6b7280", Failed: "#ef4444",
 };
 
-type Tab = "activity" | "jobs" | "earnings" | "policies" | "recovery";
+function CopyButton({ text, label }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return (
+    <button onClick={copy} title={`Copy ${label || ""}`} style={{ background: "none", border: "1px solid var(--border)", borderRadius: "4px", padding: "2px 8px", fontSize: "11px", color: copied ? "var(--accent)" : "var(--text-tertiary)", cursor: "pointer", fontFamily: "monospace", whiteSpace: "nowrap" }}>
+      {copied ? "✓" : "copy"}
+    </button>
+  );
+}
+
+type Tab = "activity" | "jobs" | "earnings" | "policies" | "recovery" | "settings";
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -155,6 +171,24 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
   // Recovery / Memory
   const [memory, setMemory] = useState<AgentMemory | null>(null);
   const [memoryLoading, setMemoryLoading] = useState(false);
+
+  // Earnings split editor
+  const [splitConfig, setSplitConfig] = useState({ dev: 60, ops: 30, reinvest: 10 });
+  const [splitSaving, setSplitSaving] = useState(false);
+  const [splitSaved, setSplitSaved] = useState(false);
+
+  // Telegram config
+  const [telegramChatId, setTelegramChatId] = useState("");
+  const [telegramSaving, setTelegramSaving] = useState(false);
+  const [telegramSaved, setTelegramSaved] = useState(false);
+  const [telegramTestMsg, setTelegramTestMsg] = useState<string | null>(null);
+  const [telegramTesting, setTelegramTesting] = useState(false);
+
+  // Settings tab
+  const [newName, setNewName] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // ─── Fetch all data in parallel ─────────────────────────────────────────────
 
@@ -237,6 +271,107 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
   useEffect(() => {
     if (tab === "recovery") fetchMemory();
   }, [tab, fetchMemory]);
+
+  // Sync agent name and telegram_chat_id into local state when agent loads
+  useEffect(() => {
+    if (agent?.name) setNewName(agent.name);
+    if (agent?.telegram_chat_id) setTelegramChatId(agent.telegram_chat_id);
+  }, [agent?.name, agent?.telegram_chat_id]);
+
+  // Fetch split config when earnings tab is active
+  useEffect(() => {
+    if (tab !== "earnings") return;
+    fetch(`/api/proxy/api/monitor/agent/${encodeURIComponent(decodedId)}/split-config`)
+      .then(r => r.json())
+      .then(d => { if (d.splitDev !== undefined) setSplitConfig({ dev: d.splitDev, ops: d.splitOps, reinvest: d.splitReinvest }); })
+      .catch(() => {});
+  }, [tab, decodedId]);
+
+  // ─── Split config save ────────────────────────────────────────────────────────
+
+  async function saveSplitConfig() {
+    if (splitConfig.dev + splitConfig.ops + splitConfig.reinvest !== 100) return;
+    setSplitSaving(true);
+    try {
+      await fetch(`/api/proxy/api/monitor/agent/${encodeURIComponent(decodedId)}/split-config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ splitDev: splitConfig.dev, splitOps: splitConfig.ops, splitReinvest: splitConfig.reinvest }),
+      });
+      setSplitSaved(true);
+      setTimeout(() => setSplitSaved(false), 2000);
+    } catch {}
+    setSplitSaving(false);
+  }
+
+  // ─── Telegram config actions ──────────────────────────────────────────────────
+
+  async function saveTelegramConfig() {
+    if (!telegramChatId.trim()) return;
+    setTelegramSaving(true);
+    try {
+      await fetch(`/api/proxy/api/monitor/agent/${encodeURIComponent(decodedId)}/telegram-config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatId: telegramChatId.trim() }),
+      });
+      setTelegramSaved(true);
+      setTimeout(() => setTelegramSaved(false), 2000);
+    } catch {}
+    setTelegramSaving(false);
+  }
+
+  async function testTelegramConfig() {
+    setTelegramTesting(true);
+    setTelegramTestMsg(null);
+    try {
+      const r = await fetch(`/api/proxy/api/monitor/agent/${encodeURIComponent(decodedId)}/telegram-test`, { method: "POST" });
+      const d = await r.json();
+      setTelegramTestMsg(d.success ? "✓ Message sent to Telegram" : `✗ ${d.error || "Failed"}`);
+      setTimeout(() => setTelegramTestMsg(null), 3000);
+    } catch {
+      setTelegramTestMsg("✗ Network error");
+      setTimeout(() => setTelegramTestMsg(null), 3000);
+    }
+    setTelegramTesting(false);
+  }
+
+  // ─── Settings actions ─────────────────────────────────────────────────────────
+
+  async function renameAgent() {
+    if (!newName.trim()) return;
+    setRenaming(true);
+    try {
+      await fetch(`/api/proxy/api/monitor/agent/${encodeURIComponent(decodedId)}/rename`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      fetchData();
+    } catch {}
+    setRenaming(false);
+  }
+
+  async function deleteAgent() {
+    setDeleting(true);
+    try {
+      await fetch(`/api/proxy/api/monitor/agent/${encodeURIComponent(decodedId)}`, { method: "DELETE" });
+      window.location.href = "/dashboard";
+    } catch {}
+    setDeleting(false);
+  }
+
+  async function exportLogs() {
+    const r = await fetch(`/api/proxy/api/monitor/agent/${encodeURIComponent(decodedId)}/feed?limit=10000`);
+    const data = await r.json();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${decodedId}-logs.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   // ─── Policy actions ───────────────────────────────────────────────────────────
 
@@ -325,6 +460,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
         <div style={{ marginBottom: "28px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
             <h1 style={{ fontSize: "26px", fontWeight: 700 }}>{agent.name || agent.id}</h1>
+            <CopyButton text={agent.id} label="agent ID" />
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: isLive ? "#10b981" : "#555" }} />
               <span style={{ fontSize: "12px", color: isLive ? "#10b981" : "var(--text-tertiary)" }}>
@@ -352,20 +488,23 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
               </div>
             ))}
             {agent.hcs_topic_id && (
-              <a
-                href={hashScanUrl || `https://hashscan.io/testnet/topic/${agent.hcs_topic_id}`}
-                target="_blank" rel="noopener"
-                style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "6px", padding: "6px 12px", fontSize: "12px", color: "var(--accent)", textDecoration: "none", fontFamily: "monospace" }}
-              >
-                HCS {agent.hcs_topic_id} ↗
-              </a>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <a
+                  href={hashScanUrl || `https://hashscan.io/testnet/topic/${agent.hcs_topic_id}`}
+                  target="_blank" rel="noopener"
+                  style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "6px", padding: "6px 12px", fontSize: "12px", color: "var(--accent)", textDecoration: "none", fontFamily: "monospace" }}
+                >
+                  HCS {agent.hcs_topic_id} ↗
+                </a>
+                <CopyButton text={agent.hcs_topic_id} label="HCS topic" />
+              </div>
             )}
           </div>
         </div>
 
         {/* Tab bar */}
         <div style={{ display: "flex", gap: "4px", borderBottom: "1px solid var(--border)", marginBottom: "28px" }}>
-          {(["activity", "jobs", "earnings", "policies", "recovery"] as Tab[]).map(t => (
+          {(["activity", "jobs", "earnings", "policies", "recovery", "settings"] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -543,6 +682,44 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
                 ))}
               </div>
             )}
+
+            {/* Earnings split config editor */}
+            <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "20px", marginTop: "24px" }}>
+              <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>Earnings Split Configuration</div>
+              <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "16px" }}>How HBAR earnings are distributed when this agent completes a job.</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+                {([
+                  { key: "dev" as const, label: "Developer %", color: "#10b981" },
+                  { key: "ops" as const, label: "Operations %", color: "#3b82f6" },
+                  { key: "reinvest" as const, label: "Reinvest %", color: "#f59e0b" },
+                ] as { key: "dev" | "ops" | "reinvest"; label: string; color: string }[]).map(({ key, label, color }) => (
+                  <div key={key}>
+                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px" }}>{label}</div>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        type="number" min={0} max={100}
+                        value={splitConfig[key]}
+                        onChange={e => setSplitConfig(s => ({ ...s, [key]: Number(e.target.value) }))}
+                        style={{ width: "100%", padding: "8px 28px 8px 10px", fontSize: "15px", fontWeight: 700, color, background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", outline: "none", fontFamily: "monospace", boxSizing: "border-box" as const }}
+                      />
+                      <span style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "var(--text-tertiary)" }}>%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "4px", background: splitConfig.dev + splitConfig.ops + splitConfig.reinvest === 100 ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)", color: splitConfig.dev + splitConfig.ops + splitConfig.reinvest === 100 ? "var(--accent)" : "#ef4444", border: `1px solid ${splitConfig.dev + splitConfig.ops + splitConfig.reinvest === 100 ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)"}` }}>
+                  {splitConfig.dev + splitConfig.ops + splitConfig.reinvest}/100
+                </span>
+                <button
+                  onClick={saveSplitConfig}
+                  disabled={splitSaving || splitConfig.dev + splitConfig.ops + splitConfig.reinvest !== 100}
+                  style={{ padding: "7px 16px", background: "var(--accent)", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, color: "#000", cursor: "pointer", opacity: (splitSaving || splitConfig.dev + splitConfig.ops + splitConfig.reinvest !== 100) ? 0.5 : 1 }}
+                >
+                  {splitSaved ? "Saved ✓" : splitSaving ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -608,6 +785,43 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
                 </div>
               </div>
             )}
+
+            {/* Notifications */}
+            <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "20px", marginTop: activeAlerts.length > 0 ? "24px" : "0" }}>
+              <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "4px" }}>Notifications</div>
+              <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "14px" }}>Get a Telegram message when this agent is blocked or triggers a high-risk alert.</div>
+              <div style={{ display: "flex", gap: "10px", alignItems: "flex-end", flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: "180px" }}>
+                  <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px" }}>Telegram Chat ID</div>
+                  <input
+                    type="text"
+                    placeholder="e.g. -100123456789"
+                    value={telegramChatId}
+                    onChange={e => setTelegramChatId(e.target.value)}
+                    style={{ width: "100%", padding: "8px 10px", fontSize: "13px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-primary)", fontFamily: "monospace", outline: "none", boxSizing: "border-box" as const }}
+                  />
+                </div>
+                <button
+                  onClick={saveTelegramConfig}
+                  disabled={telegramSaving || !telegramChatId.trim()}
+                  style={{ padding: "8px 16px", background: "var(--accent)", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, color: "#000", cursor: "pointer", opacity: (telegramSaving || !telegramChatId.trim()) ? 0.5 : 1, whiteSpace: "nowrap" }}
+                >
+                  {telegramSaved ? "Saved ✓" : telegramSaving ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={testTelegramConfig}
+                  disabled={telegramTesting}
+                  style={{ padding: "8px 16px", background: "transparent", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "13px", color: "var(--text-secondary)", cursor: "pointer", opacity: telegramTesting ? 0.5 : 1, whiteSpace: "nowrap" }}
+                >
+                  {telegramTesting ? "Sending..." : "Test"}
+                </button>
+                {telegramTestMsg && (
+                  <span style={{ fontSize: "12px", color: telegramTestMsg.startsWith("✓") ? "var(--accent)" : "#ef4444" }}>
+                    {telegramTestMsg}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -696,6 +910,85 @@ const memory = await r.json();
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Settings ───────────────────────────────────────────────────────── */}
+        {tab === "settings" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+
+            {/* Rename */}
+            <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "20px" }}>
+              <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>Rename Agent</div>
+              <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "14px" }}>Change the display name for this agent in the dashboard.</div>
+              <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px" }}>Agent Name</div>
+                  <input
+                    type="text"
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && renameAgent()}
+                    style={{ width: "100%", padding: "8px 10px", fontSize: "14px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-primary)", fontFamily: "inherit", outline: "none", boxSizing: "border-box" as const }}
+                  />
+                </div>
+                <button
+                  onClick={renameAgent}
+                  disabled={renaming || !newName.trim()}
+                  style={{ padding: "8px 16px", background: "var(--accent)", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, color: "#000", cursor: "pointer", opacity: (renaming || !newName.trim()) ? 0.5 : 1 }}
+                >
+                  {renaming ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </div>
+
+            {/* Export */}
+            <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "20px" }}>
+              <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>Export Activity Logs</div>
+              <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "14px" }}>Download complete activity log as JSON.</div>
+              <button
+                onClick={exportLogs}
+                style={{ padding: "8px 16px", background: "transparent", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "13px", color: "var(--text-secondary)", cursor: "pointer" }}
+              >
+                Export JSON
+              </button>
+            </div>
+
+            {/* Danger zone */}
+            <div style={{ background: "var(--bg-secondary)", border: "1px solid rgba(239,68,68,0.4)", borderRadius: "8px", padding: "20px" }}>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: "#ef4444", marginBottom: "4px" }}>Danger Zone</div>
+              <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "14px" }}>Permanently delete this agent and all its logs, alerts, and policies.</div>
+              {!deleteConfirm ? (
+                <button
+                  onClick={() => setDeleteConfirm(true)}
+                  style={{ padding: "8px 16px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", borderRadius: "6px", fontSize: "13px", color: "#ef4444", cursor: "pointer" }}
+                >
+                  Delete Agent
+                </button>
+              ) : (
+                <div>
+                  <div style={{ fontSize: "13px", color: "#fca5a5", marginBottom: "12px", fontWeight: 600 }}>
+                    Are you sure? This cannot be undone.
+                  </div>
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button
+                      onClick={() => setDeleteConfirm(false)}
+                      style={{ padding: "8px 16px", background: "transparent", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "13px", color: "var(--text-secondary)", cursor: "pointer" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={deleteAgent}
+                      disabled={deleting}
+                      style={{ padding: "8px 16px", background: "#ef4444", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, color: "#fff", cursor: "pointer", opacity: deleting ? 0.6 : 1 }}
+                    >
+                      {deleting ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
         )}
 

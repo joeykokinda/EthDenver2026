@@ -565,7 +565,7 @@ function broadcastLiveEvent(event) {
  * Body: { agentId, ownerWallet, name, hederaAccountId }
  */
 app.post("/api/agent/register-monitor", async (req, res) => {
-  const { agentId, ownerWallet, name, hederaAccountId } = req.body;
+  const { agentId, ownerWallet, name, hederaAccountId, telegramChatId } = req.body;
   if (!agentId) return res.status(400).json({ error: "agentId required" });
 
   let agentRecord = db.getAgent(agentId);
@@ -579,6 +579,11 @@ app.post("/api/agent/register-monitor", async (req, res) => {
 
   db.upsertAgent({ id: agentId, ownerWallet, hederaAccountId, hcsTopicId, name });
   agentRecord = db.getAgent(agentId);
+
+  // Save telegram chat ID if provided
+  if (telegramChatId) {
+    db.getDb().prepare("UPDATE agents SET telegram_chat_id = ? WHERE id = ?").run(telegramChatId, agentId);
+  }
 
   // Generate per-agent AES-256 encryption key if not yet assigned
   if (!agentRecord?.hcs_encryption_key) {
@@ -810,6 +815,75 @@ app.post("/api/monitor/telegram/test", async (req, res) => {
   const { sendMessage } = require("./telegram");
   const ok = await sendMessage("✅ Veridex Telegram integration working!", req.body.chatId);
   res.json({ success: ok, configured: !!process.env.TELEGRAM_BOT_TOKEN });
+});
+
+/**
+ * POST /api/monitor/agent/:id/telegram-config
+ * Body: { chatId: string }
+ * Save a Telegram chat ID for this agent.
+ */
+app.post("/api/monitor/agent/:id/telegram-config", (req, res) => {
+  const { id } = req.params;
+  const { chatId } = req.body;
+  if (!chatId) return res.status(400).json({ error: "chatId required" });
+  const agent = db.getAgent(id);
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+  db.getDb().prepare("UPDATE agents SET telegram_chat_id = ? WHERE id = ?").run(chatId, id);
+  res.json({ success: true });
+});
+
+/**
+ * POST /api/monitor/agent/:id/telegram-test
+ * Send a test Telegram message to the agent's configured chat ID.
+ */
+app.post("/api/monitor/agent/:id/telegram-test", async (req, res) => {
+  const { id } = req.params;
+  const agent = db.getAgent(id);
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+  const chatId = agent.telegram_chat_id;
+  if (!chatId) return res.json({ success: false, error: "No Telegram chat ID configured" });
+  const { sendMessage } = require("./telegram");
+  try {
+    const ok = await sendMessage(
+      `✅ *Veridex test alert*\nAgent: *${agent.name || id}*\nTelegram notifications are working.`,
+      chatId
+    );
+    if (!ok) return res.json({ success: false, error: "Telegram send failed — check bot token and chat ID" });
+    res.json({ success: true });
+  } catch (e) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
+/**
+ * POST /api/monitor/agent/:id/rename
+ * Body: { name: string }
+ */
+app.post("/api/monitor/agent/:id/rename", (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: "name required" });
+  const agent = db.getAgent(id);
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+  db.getDb().prepare("UPDATE agents SET name = ? WHERE id = ?").run(name.trim(), id);
+  res.json({ success: true });
+});
+
+/**
+ * DELETE /api/monitor/agent/:id
+ * Delete agent and all associated data.
+ */
+app.delete("/api/monitor/agent/:id", (req, res) => {
+  const { id } = req.params;
+  const agent = db.getAgent(id);
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+  const d = db.getDb();
+  d.prepare("DELETE FROM logs WHERE agent_id = ?").run(id);
+  d.prepare("DELETE FROM alerts WHERE agent_id = ?").run(id);
+  d.prepare("DELETE FROM policies WHERE agent_id = ?").run(id);
+  d.prepare("DELETE FROM earnings WHERE agent_id = ?").run(id);
+  d.prepare("DELETE FROM agents WHERE id = ?").run(id);
+  res.json({ success: true });
 });
 
 // ── Layer 1: Secrets Vault ────────────────────────────────────────────────────

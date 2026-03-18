@@ -32,6 +32,7 @@ function statusDot(agent: AgentCard, recentLogs: Log[]) {
   if (agent.activeAlerts > 0) return { dot: "#ef4444", label: "Alert" };
   if (lastLog && Date.now() - lastLog.timestamp < 5 * 60 * 1000) return { dot: "#10b981", label: "Active" };
   if (lastLog && Date.now() - lastLog.timestamp < 30 * 60 * 1000) return { dot: "#f59e0b", label: "Idle" };
+  if (lastLog && Date.now() - lastLog.timestamp < 24 * 60 * 60 * 1000) return { dot: "#f59e0b", label: "Warning", warning: true };
   return { dot: "#555", label: "Offline" };
 }
 
@@ -42,6 +43,12 @@ function AgentCardUI({ agent, recentLogs }: { agent: AgentCard; recentLogs: Log[
 
   return (
     <div style={{ background: "var(--bg-secondary)", border: `1px solid ${agent.activeAlerts > 0 ? "rgba(239,68,68,0.4)" : "var(--border)"}`, borderRadius: "10px", padding: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+      {/* Offline warning banner */}
+      {"warning" in status && status.warning && (
+        <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 6, padding: "8px 12px", fontSize: 12, color: "#f59e0b" }}>
+          No recent activity — agent may be offline or skill not installed
+        </div>
+      )}
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>

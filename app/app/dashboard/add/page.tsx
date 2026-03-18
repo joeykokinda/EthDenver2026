@@ -5,6 +5,21 @@ import Link from "next/link";
 import { Nav } from "../../components/Nav";
 import { useWallet } from "../../lib/wallet";
 
+function CopyButton({ text, label }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return (
+    <button onClick={copy} title={`Copy ${label || ""}`} style={{ background: "none", border: "1px solid #444", borderRadius: "4px", padding: "2px 8px", fontSize: "11px", color: copied ? "var(--accent)" : "var(--text-tertiary)", cursor: "pointer", fontFamily: "monospace", whiteSpace: "nowrap", marginTop: "6px" }}>
+      {copied ? "✓ copied" : "copy"}
+    </button>
+  );
+}
+
 type AgentType = "openclaw" | "custom";
 
 function slugify(name: string): string {
@@ -396,17 +411,21 @@ export default function AddAgentPage() {
               <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px" }}>
                 <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Agent ID</div>
                 <div style={{ fontSize: "14px", fontFamily: "monospace", color: "var(--text-primary)" }}>{result.agentId}</div>
+                <CopyButton text={result.agentId} label="agent ID" />
               </div>
               <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px" }}>
                 <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>HCS Audit Topic</div>
                 {result.hcsTopicId ? (
-                  <a
-                    href={`https://hashscan.io/testnet/topic/${result.hcsTopicId}`}
-                    target="_blank" rel="noopener noreferrer"
-                    style={{ fontSize: "14px", fontFamily: "monospace", color: "var(--accent)", textDecoration: "none" }}
-                  >
-                    {result.hcsTopicId} ↗
-                  </a>
+                  <>
+                    <a
+                      href={`https://hashscan.io/testnet/topic/${result.hcsTopicId}`}
+                      target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: "14px", fontFamily: "monospace", color: "var(--accent)", textDecoration: "none" }}
+                    >
+                      {result.hcsTopicId} ↗
+                    </a>
+                    <div><CopyButton text={result.hcsTopicId} label="HCS topic" /></div>
+                  </>
                 ) : (
                   <div style={{ fontSize: "14px", fontFamily: "monospace", color: "var(--text-tertiary)" }}>Creating...</div>
                 )}
