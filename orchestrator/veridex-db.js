@@ -92,8 +92,21 @@ function initSchema() {
   try { db.exec("ALTER TABLE agents ADD COLUMN config TEXT"); } catch {}
   try { db.exec("ALTER TABLE agents ADD COLUMN hcs_encryption_key TEXT"); } catch {}
   try { db.exec("ALTER TABLE agents ADD COLUMN reputation_score INTEGER NOT NULL DEFAULT 500"); } catch {}
+  try { db.exec("ALTER TABLE agents ADD COLUMN safety_score INTEGER NOT NULL DEFAULT 1000"); } catch {}
   try { db.exec("ALTER TABLE agents ADD COLUMN telegram_chat_id TEXT"); } catch {}
   ensureJobsTable();
+  try { db.exec(`CREATE TABLE IF NOT EXISTS agent_delegations (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    delegate_address TEXT NOT NULL,
+    delegator_address TEXT NOT NULL,
+    allowed_actions TEXT NOT NULL,
+    caveat_type TEXT NOT NULL DEFAULT 'action_scope',
+    signature TEXT NOT NULL,
+    delegation_hash TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+  )`); } catch {}
 }
 
 function ensureJobsTable() {
@@ -246,7 +259,7 @@ function getAgentStats(agentId) {
   const blocked = d.prepare("SELECT COUNT(*) as c FROM logs WHERE agent_id = ? AND risk_level = 'blocked'").get(agentId);
   const high    = d.prepare("SELECT COUNT(*) as c FROM logs WHERE agent_id = ? AND risk_level = 'high'").get(agentId);
   const earnings = d.prepare("SELECT COALESCE(SUM(amount_hbar),0) as total FROM earnings WHERE agent_id = ?").get(agentId);
-  const agent   = d.prepare("SELECT reputation_score FROM agents WHERE id = ?").get(agentId);
+  const agent   = d.prepare("SELECT reputation_score, safety_score FROM agents WHERE id = ?").get(agentId);
   return {
     totalActions: total.c,
     actionsToday: today.c,
@@ -254,14 +267,43 @@ function getAgentStats(agentId) {
     highRiskActions: high.c,
     totalEarned: earnings.total,
     reputationScore: agent?.reputation_score ?? 500,
+    safetyScore: agent?.safety_score ?? 1000,
   };
 }
 
-function decrementReputation(agentId, delta = 5) {
+// Reputation changes only from job outcomes (ERC-8183).
+// delta: +10 on-time, +3 late, -15 abandoned, -5 disputed, +20 five-star, -20 one-star
+function updateReputationFromJob(agentId, delta) {
   const d = getDb();
-  d.prepare(
-    "UPDATE agents SET reputation_score = MAX(0, COALESCE(reputation_score, 500) - ?) WHERE id = ?"
-  ).run(delta, agentId);
+  if (delta >= 0) {
+    d.prepare(
+      "UPDATE agents SET reputation_score = MIN(1000, COALESCE(reputation_score, 500) + ?) WHERE id = ?"
+    ).run(delta, agentId);
+  } else {
+    d.prepare(
+      "UPDATE agents SET reputation_score = MAX(0, COALESCE(reputation_score, 500) + ?) WHERE id = ?"
+    ).run(delta, agentId);
+  }
+}
+
+// Safety score — tracks block behavior independently from reputation.
+// Each blocked action decrements by 5 (floor 0). Positive delta can restore it.
+function updateSafetyScore(agentId, delta) {
+  const d = getDb();
+  if (delta >= 0) {
+    d.prepare(
+      "UPDATE agents SET safety_score = MIN(1000, COALESCE(safety_score, 1000) + ?) WHERE id = ?"
+    ).run(delta, agentId);
+  } else {
+    d.prepare(
+      "UPDATE agents SET safety_score = MAX(0, COALESCE(safety_score, 1000) + ?) WHERE id = ?"
+    ).run(delta, agentId);
+  }
+}
+
+// Kept for internal compatibility; prefer updateSafetyScore for new call sites.
+function decrementReputation(agentId, delta = 5) {
+  updateSafetyScore(agentId, -delta);
 }
 
 function parseLog(row) {
@@ -462,6 +504,23 @@ function deleteWebhook(id) {
   getDb().prepare("DELETE FROM agent_webhooks WHERE id = ?").run(id);
 }
 
+// ── Agent Delegations (ERC-7715) ───────────────────────────────────────────────
+
+function insertDelegation({ agentId, delegateAddress, delegatorAddress, allowedActions, signature, delegationHash, caveatType }) {
+  const id = randomUUID();
+  getDb().prepare(`INSERT INTO agent_delegations (id, agent_id, delegate_address, delegator_address, allowed_actions, caveat_type, signature, delegation_hash) VALUES (?,?,?,?,?,?,?,?)`)
+    .run(id, agentId, delegateAddress, delegatorAddress, JSON.stringify(allowedActions), caveatType || "action_scope", signature, delegationHash);
+  return id;
+}
+
+function getDelegations(agentId) {
+  return getDb().prepare("SELECT * FROM agent_delegations WHERE agent_id = ? AND active = 1 ORDER BY created_at DESC").all(agentId);
+}
+
+function revokeDelegation(id) {
+  return getDb().prepare("UPDATE agent_delegations SET active = 0 WHERE id = ?").run(id);
+}
+
 // ── Agent lookup by wallet ─────────────────────────────────────────────────────
 
 function findAgentByWallet(walletAddress) {
@@ -490,4 +549,6 @@ module.exports = {
   insertVaultGrant, getVaultGrants,
   // webhooks
   insertWebhook, getWebhooks, deleteWebhook,
+  // delegations (ERC-7715)
+  insertDelegation, getDelegations, revokeDelegation,
 };

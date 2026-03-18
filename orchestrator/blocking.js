@@ -46,10 +46,32 @@ const BLACKLISTED_DOMAINS = [
  * @param {string} tool - tool name
  * @param {object} params - sanitized parameters
  * @param {string[]} customPolicies - agent-specific policy values [{ type, value }]
+ * @param {Array} delegations - active ERC-7715 delegations for this agent (optional)
  * @returns {{ reason: string, riskLevel: string } | null}
  */
-function checkBlocking(agentId, action, tool, params, customPolicies = []) {
+function checkBlocking(agentId, action, tool, params, customPolicies = [], delegations = []) {
   const paramsStr = JSON.stringify(params || {}).toLowerCase();
+
+  // 0. ERC-7715 delegation scope check — if agent has active delegations,
+  //    the current action must be in at least one delegation's allowed_actions.
+  //    If no delegations are configured, skip this check (delegations are optional).
+  if (delegations && delegations.length > 0) {
+    const actionKey = action || tool || "";
+    const isAuthorized = delegations.some(d => {
+      try {
+        const allowed = typeof d.allowed_actions === "string"
+          ? JSON.parse(d.allowed_actions)
+          : d.allowed_actions;
+        return Array.isArray(allowed) && allowed.includes(actionKey);
+      } catch { return false; }
+    });
+    if (!isAuthorized) {
+      return {
+        reason: "Action not authorized by any active delegation — add this capability to your agent's delegation scope",
+        riskLevel: "blocked",
+      };
+    }
+  }
 
   // 1. Shell command dangerous pattern check
   if (action === "shell_exec" || tool === "bash" || tool === "shell" || tool === "exec") {

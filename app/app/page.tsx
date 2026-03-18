@@ -670,6 +670,30 @@ export default function LandingPage() {
 
         </section>
 
+        {/* ── ERC-7715 DELEGATION ──────────────────────────────────────────── */}
+        <section style={{ borderTop:"1px solid var(--border)", padding:"64px 24px", background:"rgba(129,140,248,0.015)" }}>
+          <div style={{ maxWidth:"720px", margin:"0 auto" }}>
+            <p style={{ fontSize:"11px", fontFamily:"monospace", color:"#818cf8", marginBottom:"14px", textTransform:"uppercase" as const, letterSpacing:"1px" }}>MetaMask ERC-7715 · Delegation-Scoped Permissions</p>
+            <h2 style={{ fontSize:"clamp(18px,3vw,26px)", fontWeight:700, marginBottom:"12px", lineHeight:1.2 }}>Define what agents can do before they do it.</h2>
+            <p style={{ fontSize:"14px", color:"var(--text-secondary)", lineHeight:1.8, marginBottom:"8px" }}>
+              Veridex now supports ERC-7715 MetaMask delegations. The wallet owner signs a scoped permission grant — specifying exactly which actions the agent is authorized to perform. Veridex checks this at every preflight, blocking anything outside the scope before it runs.
+            </p>
+            <p style={{ fontSize:"14px", color:"var(--text-tertiary)", lineHeight:1.8, marginBottom:"24px" }}>
+              This is the right security model: define permissions upfront, enforce them proactively — not just react to bad behavior after the fact.
+            </p>
+            <div style={{ background:"#09090b", border:"1px solid rgba(129,140,248,0.25)", borderRadius:"8px", padding:"18px 20px" }}>
+              <div style={{ fontSize:"11px", color:"#818cf8", fontFamily:"monospace", marginBottom:"10px", textTransform:"uppercase" as const, letterSpacing:"0.5px" }}>ERC-7715 delegation object</div>
+              <pre style={{ margin:0, fontFamily:"monospace", fontSize:"13px", color:"var(--text-secondary)", lineHeight:1.8 }}>{`{
+  delegate:       "0xAgentAddress…",
+  delegator:      "0xOwnerWallet…",
+  allowedActions: ["web_search", "api_call", "file_read"],
+  caveatType:     "action_scope",
+  version:        "erc7715-v1"
+}`}</pre>
+            </div>
+          </div>
+        </section>
+
         {/* ── WHY HEDERA ───────────────────────────────────────────────────── */}
         <section style={{ borderTop:"1px solid var(--border)", padding:"64px 24px" }}>
           <div style={{ maxWidth:"600px", margin:"0 auto" }}>

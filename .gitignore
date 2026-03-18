@@ -6,7 +6,6 @@ node_modules/
 .env
 .agent-wallet.json
 agents/.wallets/
-DESIGN.md
 # Hardhat build artifacts — artifacts/ committed so Docker doesn't need to recompile
 cache/
 **/cache/
@@ -39,10 +38,8 @@ logs/job-descriptions.json
 logs/job-events.json
 
 # Internal docs (for Rex only)
-TECHNICAL.md
-DEMO.md
-SUBMISSION.md
-CLAUDE.md
+*.md
+!README.md
 
 # SQLite WAL/SHM files (runtime state, not source)
 *.db-shm

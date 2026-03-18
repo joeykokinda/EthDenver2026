@@ -327,7 +327,8 @@ app.post("/api/log", async (req, res) => {
   }
 
   const policies = db.getAgentPolicies(agentId);
-  const blockResult = checkBlocking(agentId, action, tool, params, policies);
+  const delegations = db.getDelegations(agentId);
+  const blockResult = checkBlocking(agentId, action, tool, params, policies, delegations);
 
   if (blockResult) {
     // Blocked — log it, alert, return denied
@@ -1405,6 +1406,46 @@ app.get("/api/monitor/agent/:agentId/webhooks", (req, res) => {
  */
 app.delete("/api/monitor/agent/:agentId/webhook/:webhookId", (req, res) => {
   db.deleteWebhook(req.params.webhookId);
+  res.json({ success: true });
+});
+
+// ── ERC-7715 Delegation endpoints ──────────────────────────────────────────────
+
+/**
+ * POST /api/monitor/agent/:agentId/delegation
+ * Body: { delegateAddress, delegatorAddress, allowedActions, signature, delegationHash, caveatType }
+ */
+app.post("/api/monitor/agent/:agentId/delegation", (req, res) => {
+  const { agentId } = req.params;
+  const { delegateAddress, delegatorAddress, allowedActions, signature, delegationHash, caveatType } = req.body;
+  if (!delegateAddress || !delegatorAddress || !allowedActions || !signature || !delegationHash) {
+    return res.status(400).json({ error: "delegateAddress, delegatorAddress, allowedActions, signature, and delegationHash are required" });
+  }
+  if (!Array.isArray(allowedActions) || allowedActions.length === 0) {
+    return res.status(400).json({ error: "allowedActions must be a non-empty array" });
+  }
+  const agent = db.getAgent(agentId);
+  if (!agent) {
+    db.upsertAgent({ id: agentId });
+  }
+  const id = db.insertDelegation({ agentId, delegateAddress, delegatorAddress, allowedActions, signature, delegationHash, caveatType });
+  res.json({ success: true, id });
+});
+
+/**
+ * GET /api/monitor/agent/:agentId/delegations
+ */
+app.get("/api/monitor/agent/:agentId/delegations", (req, res) => {
+  const agent = db.getAgent(req.params.agentId);
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+  res.json({ delegations: db.getDelegations(req.params.agentId) });
+});
+
+/**
+ * DELETE /api/monitor/agent/:agentId/delegation/:delegationId
+ */
+app.delete("/api/monitor/agent/:agentId/delegation/:delegationId", (req, res) => {
+  db.revokeDelegation(req.params.delegationId);
   res.json({ success: true });
 });
 

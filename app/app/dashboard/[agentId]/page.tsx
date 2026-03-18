@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Nav } from "../../components/Nav";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { use } from "react";
+import { keccak256, toUtf8Bytes } from "ethers";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -90,6 +91,29 @@ interface AgentMemory {
   summary: string;
 }
 
+interface Delegation {
+  id: string;
+  agent_id: string;
+  delegate_address: string;
+  delegator_address: string;
+  allowed_actions: string;
+  caveat_type: string;
+  signature: string;
+  delegation_hash: string;
+  active: number;
+  created_at: number;
+}
+
+const AGENT_ACTIONS = [
+  { id: "web_search",     label: "Web Search",    desc: "Search the internet" },
+  { id: "file_read",      label: "File Read",      desc: "Read local files" },
+  { id: "file_write",     label: "File Write",     desc: "Write local files" },
+  { id: "shell_exec",     label: "Shell Execute",  desc: "Run shell commands (high risk)" },
+  { id: "api_call",       label: "API Calls",      desc: "Make HTTP requests" },
+  { id: "earnings_split", label: "Earnings Split", desc: "Distribute HBAR earnings" },
+  { id: "hbar_send",      label: "HBAR Send",      desc: "Send HBAR payments" },
+];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function timeAgo(ts: number) {
@@ -137,7 +161,7 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
   );
 }
 
-type Tab = "activity" | "jobs" | "earnings" | "policies" | "recovery" | "settings";
+type Tab = "activity" | "jobs" | "earnings" | "policies" | "recovery" | "settings" | "delegations";
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -189,6 +213,14 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
   const [renaming, setRenaming] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Delegations tab
+  const [delegations, setDelegations] = useState<Delegation[]>([]);
+  const [delegationsLoading, setDelegationsLoading] = useState(false);
+  const [selectedActions, setSelectedActions] = useState<string[]>([]);
+  const [selectedCaveat, setSelectedCaveat] = useState("action_scope");
+  const [delegationSigning, setDelegationSigning] = useState(false);
+  const [delegationMsg, setDelegationMsg] = useState<string | null>(null);
 
   // ─── Fetch all data in parallel ─────────────────────────────────────────────
 
@@ -404,6 +436,97 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
     } catch {}
   }
 
+  // ─── Delegation actions ───────────────────────────────────────────────────────
+
+  const fetchDelegations = useCallback(async () => {
+    setDelegationsLoading(true);
+    try {
+      const res = await fetch(`/api/proxy/api/monitor/agent/${encodeURIComponent(decodedId)}/delegations`);
+      if (res.ok) {
+        const d = await res.json();
+        setDelegations(d.delegations || []);
+      }
+    } catch {}
+    setDelegationsLoading(false);
+  }, [decodedId]);
+
+  useEffect(() => {
+    if (tab === "delegations") fetchDelegations();
+  }, [tab, fetchDelegations]);
+
+  async function signAndDelegate() {
+    if (selectedActions.length === 0) {
+      setDelegationMsg("Select at least one allowed action.");
+      setTimeout(() => setDelegationMsg(null), 3000);
+      return;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const winEthereum = typeof window !== "undefined" ? (window as any).ethereum : undefined;
+    if (!winEthereum) {
+      setDelegationMsg("MetaMask not found. Please install MetaMask.");
+      setTimeout(() => setDelegationMsg(null), 4000);
+      return;
+    }
+    setDelegationSigning(true);
+    setDelegationMsg(null);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const eth = winEthereum as { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> };
+      const accounts = await eth.request({ method: "eth_requestAccounts" }) as string[];
+      const connectedAddress = accounts[0];
+      const delegation = {
+        delegate: decodedId,
+        delegator: connectedAddress,
+        allowedActions: selectedActions,
+        caveatType: selectedCaveat,
+        timestamp: Date.now(),
+        version: "erc7715-v1",
+      };
+      const msgStr = JSON.stringify(delegation);
+      const signature = await eth.request({
+        method: "personal_sign",
+        params: [msgStr, connectedAddress],
+      }) as string;
+      const delegationHash = keccak256(toUtf8Bytes(msgStr));
+      const res = await fetch(`/api/proxy/api/monitor/agent/${encodeURIComponent(decodedId)}/delegation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          delegateAddress: decodedId,
+          delegatorAddress: connectedAddress,
+          allowedActions: selectedActions,
+          signature,
+          delegationHash,
+          caveatType: selectedCaveat,
+        }),
+      });
+      if (res.ok) {
+        setDelegationMsg("Delegation created successfully.");
+        setSelectedActions([]);
+        fetchDelegations();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setDelegationMsg(`Error: ${(err as { error?: string }).error || "Failed to create delegation"}`);
+      }
+    } catch (e: unknown) {
+      const err = e as { message?: string; code?: number };
+      if (err?.code === 4001) {
+        setDelegationMsg("Signature rejected by user.");
+      } else {
+        setDelegationMsg(`Error: ${err?.message || "Unknown error"}`);
+      }
+    }
+    setTimeout(() => setDelegationMsg(null), 4000);
+    setDelegationSigning(false);
+  }
+
+  async function revokeDelegation(delegationId: string) {
+    try {
+      await fetch(`/api/proxy/api/monitor/agent/${encodeURIComponent(decodedId)}/delegation/${delegationId}`, { method: "DELETE" });
+      fetchDelegations();
+    } catch {}
+  }
+
   // ─── Derived ─────────────────────────────────────────────────────────────────
 
   const allLogs: Log[] = [...liveLogs, ...logs].reduce((acc: Log[], l) => {
@@ -504,7 +627,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
 
         {/* Tab bar */}
         <div style={{ display: "flex", gap: "4px", borderBottom: "1px solid var(--border)", marginBottom: "28px" }}>
-          {(["activity", "jobs", "earnings", "policies", "recovery", "settings"] as Tab[]).map(t => (
+          {(["activity", "jobs", "earnings", "policies", "recovery", "settings", "delegations"] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -910,6 +1033,131 @@ const memory = await r.json();
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Delegations ────────────────────────────────────────────────────── */}
+        {tab === "delegations" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+
+            {/* Create Delegation */}
+            <div style={{ background: "var(--bg-secondary)", border: "1px solid rgba(16,185,129,0.35)", borderRadius: "8px", padding: "20px" }}>
+              <div style={{ fontSize: "14px", fontWeight: 700, marginBottom: "4px" }}>Grant Capability Delegation (ERC-7715)</div>
+              <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "18px", lineHeight: 1.6 }}>
+                Define exactly what this agent is allowed to do. The wallet owner signs the delegation — Veridex enforces it at every preflight check.
+              </div>
+
+              {/* Action checkboxes */}
+              <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px" }}>Allowed Actions</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "8px", marginBottom: "16px" }}>
+                {AGENT_ACTIONS.map(a => {
+                  const checked = selectedActions.includes(a.id);
+                  return (
+                    <label key={a.id} style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "10px 12px", background: checked ? "rgba(16,185,129,0.06)" : "var(--bg-tertiary)", border: `1px solid ${checked ? "rgba(16,185,129,0.4)" : "var(--border)"}`, borderRadius: "6px", cursor: "pointer", transition: "all 0.15s" }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={e => {
+                          if (e.target.checked) setSelectedActions(p => [...p, a.id]);
+                          else setSelectedActions(p => p.filter(x => x !== a.id));
+                        }}
+                        style={{ marginTop: "2px", accentColor: "var(--accent)" }}
+                      />
+                      <div>
+                        <div style={{ fontSize: "13px", fontWeight: 600, color: checked ? "var(--accent)" : "var(--text-primary)" }}>{a.label}</div>
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{a.desc}</div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {/* Caveat type */}
+              <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "18px" }}>
+                <div>
+                  <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px" }}>Caveat Type</div>
+                  <select
+                    value={selectedCaveat}
+                    onChange={e => setSelectedCaveat(e.target.value)}
+                    style={{ padding: "7px 10px", fontSize: "13px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-primary)", cursor: "pointer" }}
+                  >
+                    <option value="action_scope">Action Scope</option>
+                    <option value="time_bound">Time Bound</option>
+                  </select>
+                </div>
+                <div style={{ alignSelf: "flex-end" }}>
+                  <button
+                    onClick={signAndDelegate}
+                    disabled={delegationSigning || selectedActions.length === 0}
+                    style={{ padding: "8px 20px", background: "var(--accent)", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 700, color: "#000", cursor: "pointer", opacity: (delegationSigning || selectedActions.length === 0) ? 0.5 : 1 }}
+                  >
+                    {delegationSigning ? "Signing..." : "Sign & Delegate"}
+                  </button>
+                </div>
+              </div>
+
+              {delegationMsg && (
+                <div style={{ fontSize: "13px", padding: "8px 12px", borderRadius: "6px", background: delegationMsg.startsWith("Error") || delegationMsg.startsWith("Select") || delegationMsg.startsWith("Signature") || delegationMsg.startsWith("MetaMask") ? "rgba(239,68,68,0.08)" : "rgba(16,185,129,0.08)", border: `1px solid ${delegationMsg.startsWith("Error") || delegationMsg.startsWith("Select") || delegationMsg.startsWith("Signature") || delegationMsg.startsWith("MetaMask") ? "rgba(239,68,68,0.3)" : "rgba(16,185,129,0.3)"}`, color: delegationMsg.startsWith("Error") || delegationMsg.startsWith("Select") || delegationMsg.startsWith("Signature") || delegationMsg.startsWith("MetaMask") ? "#ef4444" : "var(--accent)" }}>
+                  {delegationMsg}
+                </div>
+              )}
+            </div>
+
+            {/* Active Delegations */}
+            <div>
+              <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "12px" }}>Active Delegations</div>
+              {delegationsLoading ? (
+                <div style={{ textAlign: "center", padding: "40px", color: "var(--text-tertiary)", fontSize: "14px" }}>Loading...</div>
+              ) : delegations.length === 0 ? (
+                <div style={{ padding: "20px", background: "rgba(59,130,246,0.05)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: "8px", fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                  No delegations. This agent operates with default Veridex blocking rules. Add a delegation above to scope its capabilities.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {delegations.map(d => {
+                    let actions: string[] = [];
+                    try { actions = JSON.parse(d.allowed_actions); } catch {}
+                    const shortDelegator = d.delegator_address
+                      ? `${d.delegator_address.slice(0, 6)}…${d.delegator_address.slice(-4)}`
+                      : "unknown";
+                    return (
+                      <div key={d.id} style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "14px 16px" }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", marginBottom: "10px" }}>
+                          <div>
+                            <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "4px" }}>Delegator</div>
+                            <div style={{ fontSize: "13px", fontFamily: "monospace", color: "var(--text-primary)" }}>{shortDelegator}</div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                            <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: "rgba(129,140,248,0.1)", border: "1px solid rgba(129,140,248,0.3)", color: "#818cf8", whiteSpace: "nowrap" as const }}>
+                              {d.caveat_type}
+                            </span>
+                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)", whiteSpace: "nowrap" as const }}>{timeAgo(d.created_at)}</span>
+                            <button
+                              onClick={() => revokeDelegation(d.id)}
+                              title="Revoke delegation"
+                              style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "4px", color: "#ef4444", cursor: "pointer", fontSize: "14px", padding: "2px 8px", lineHeight: 1 }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+                          {actions.map(act => (
+                            <span key={act} style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", color: "#10b981" }}>
+                              {act}
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>
+                          hash: {d.delegation_hash.slice(0, 12)}…
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
           </div>
         )}
 
