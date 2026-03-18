@@ -155,10 +155,10 @@ function DecisionDemo() {
   return (
     <div className="ademo">
       <div className="ademo-label">POST /api/log</div>
-      <div style={{ fontFamily:"monospace", fontSize:"12px", lineHeight:1.9 }}>
+      <div style={{ fontFamily:"monospace", fontSize:"13px", lineHeight:2 }}>
         <div style={{ color:"var(--text-tertiary)" }}>tool: <span style={{ color:"#818cf8" }}>{d.tool}</span></div>
         <div style={{ color:"var(--text-tertiary)" }}>params: <span style={{ color:"#a3a3a3" }}>{d.params}</span></div>
-        <div style={{ minHeight:"40px", paddingTop:"4px" }}>
+        <div style={{ minHeight:"44px", paddingTop:"4px" }}>
           {ph===1&&<div style={{ color:"#f59e0b" }}>▶ evaluating<span className="blink">…</span></div>}
           {ph===2&&(d.ok
             ? <div style={{ color:"#10b981" }}>✓ allowed: true &nbsp;risk: {d.risk}</div>
@@ -193,7 +193,7 @@ function BlockingDemo() {
   return (
     <div className="ademo">
       <div className="ademo-label">blocking engine</div>
-      <div style={{ fontFamily:"monospace", fontSize:"12px", lineHeight:1.75 }}>
+      <div style={{ fontFamily:"monospace", fontSize:"13px", lineHeight:1.85 }}>
         <div style={{ color:"#fca5a5", marginBottom:"6px" }}>$ {ex.cmd}</div>
         {RULES.map((r,i)=>{
           const checked=ri>=i, matched=done&&i===ex.hit;
@@ -218,7 +218,7 @@ function HCSDemo() {
   return (
     <div className="ademo">
       <div className="ademo-label">Hedera HCS audit</div>
-      <div style={{ fontFamily:"monospace", fontSize:"12px", lineHeight:1.9 }}>
+      <div style={{ fontFamily:"monospace", fontSize:"13px", lineHeight:2 }}>
         <div style={{ color:ph>=1?"#818cf8":"#a3a3a3", transition:"color 0.3s" }}>{ph<2?'{"action":"file_read","risk":"low"}':"eCfR+2nX8kBvQ…AES-GCM…9xZp=="}</div>
         <div style={{ color:ph>=1?"#f59e0b":"#252525", transition:"color 0.3s" }}>↓ AES-256-GCM{ph===1&&<span className="blink"> encrypting…</span>}</div>
         <div style={{ color:ph>=3?"var(--text-tertiary)":"#252525", transition:"color 0.3s" }}>topic: 0.0.8228693 · seq: {ph>=3?"1848":"—"}</div>
@@ -273,7 +273,7 @@ function SplitDemo() {
   return (
     <div className="ademo">
       <div className="ademo-label">earnings settlement</div>
-      <div style={{ fontFamily:"monospace", fontSize:"12px", lineHeight:2 }}>
+      <div style={{ fontFamily:"monospace", fontSize:"13px", lineHeight:2.1 }}>
         <div style={{ color:ph>=1?"#10b981":"#252525", transition:"color 0.3s", fontWeight:ph>=1?700:400 }}>job #1847: 3.2 ℏ received</div>
         <div style={{ color:ph>=2?"#555":"#252525", transition:"color 0.3s" }}>↓ HTS auto-split</div>
         <div style={{ color:ph>=3?"#10b981":"#252525", transition:"color 0.3s" }}>├─ 1.920 ℏ → dev wallet</div>
@@ -298,7 +298,7 @@ function VaultDemo() {
   return (
     <div className="ademo">
       <div className="ademo-label">secrets vault</div>
-      <div style={{ fontFamily:"monospace", fontSize:"12px", lineHeight:1.9 }}>
+      <div style={{ fontFamily:"monospace", fontSize:"13px", lineHeight:2 }}>
         <div style={{ color:ph>=1?"var(--text-tertiary)":"#252525", transition:"color 0.3s" }}>store: OPENAI_KEY = sk-proj…</div>
         <div style={{ color:ph>=2?"#818cf8":"#252525", transition:"color 0.3s" }}>vsec_8f2a1c… ✓ encrypted</div>
         <div style={{ height:"4px" }}/>
@@ -323,7 +323,7 @@ function TelegramDemo() {
   return (
     <div className="ademo">
       <div className="ademo-label">telegram kill-switch</div>
-      <div style={{ fontFamily:"monospace", fontSize:"12px", lineHeight:1.85 }}>
+      <div style={{ fontFamily:"monospace", fontSize:"13px", lineHeight:2 }}>
         {ph>=1&&(
           <div className="la" style={{ background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.2)", borderRadius:"6px", padding:"6px 10px", marginBottom:"8px" }}>
             <div style={{ color:"#ef4444", fontWeight:700 }}>⛔ Veridex Alert</div>
@@ -358,7 +358,7 @@ function ReputationDemo() {
   return (
     <div className="ademo">
       <div className="ademo-label">ERC-8004 reputation</div>
-      <div style={{ fontFamily:"monospace", fontSize:"12px", lineHeight:1.9 }}>
+      <div style={{ fontFamily:"monospace", fontSize:"13px", lineHeight:2 }}>
         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"4px" }}>
           <span style={{ color:"var(--text-tertiary)" }}>rogue-bot-demo</span>
           <span style={{ color:score>480?"#f59e0b":"#ef4444", fontWeight:700, transition:"color 0.3s" }}>{score} / 1000</span>
@@ -386,7 +386,7 @@ function IdentityDemo() {
   return (
     <div className="ademo">
       <div className="ademo-label">identity proof + auto-wallet</div>
-      <div style={{ fontFamily:"monospace", fontSize:"12px", lineHeight:1.9 }}>
+      <div style={{ fontFamily:"monospace", fontSize:"13px", lineHeight:2 }}>
         <div style={{ color:ph>=1?"var(--text-tertiary)":"#252525", transition:"color 0.3s" }}>challenge: 8f2a1b9c…  ⏱ 5s</div>
         <div style={{ color:ph>=2?"#f59e0b":"#252525",            transition:"color 0.3s" }}>agent signing…</div>
         <div style={{ color:ph>=3?"#10b981":"#252525",            transition:"color 0.3s" }}>signed in 47ms ✓ &nbsp;(human: impossible)</div>
@@ -409,10 +409,10 @@ function PoliciesDemo() {
   return (
     <div className="ademo">
       <div className="ademo-label">per-agent policies</div>
-      <div style={{ fontFamily:"monospace", fontSize:"12px" }}>
+      <div style={{ fontFamily:"monospace", fontSize:"13px" }}>
         {POLICIES.map((p,i)=>(
-          <div key={p.v} style={{ display:"flex", gap:"8px", padding:"5px 6px", marginBottom:"2px", borderRadius:"4px", background:hi===i?"rgba(16,185,129,0.07)":"transparent", border:hi===i?"1px solid rgba(16,185,129,0.2)":"1px solid transparent", transition:"all 0.3s" }}>
-            <span style={{ color:"#818cf8", minWidth:"100px", fontSize:"11px" }}>{p.type}</span>
+          <div key={p.v} style={{ display:"flex", gap:"8px", padding:"6px 8px", marginBottom:"3px", borderRadius:"4px", background:hi===i?"rgba(16,185,129,0.07)":"transparent", border:hi===i?"1px solid rgba(16,185,129,0.2)":"1px solid transparent", transition:"all 0.3s" }}>
+            <span style={{ color:"#818cf8", minWidth:"110px", fontSize:"11px" }}>{p.type}</span>
             <span style={{ color:hi===i?"#10b981":"var(--text-tertiary)", transition:"color 0.3s", flex:1 }}>{p.v}</span>
             <span style={{ color:"#444", fontSize:"11px" }}>{p.label}</span>
           </div>
@@ -456,11 +456,11 @@ function BCard({ num, title, body, demo, accent="#10b981", style: s={} }: {
 }) {
   const { ref, v } = useReveal(0.06);
   return (
-    <div ref={ref} className={v?"bcard bcard-in":"bcard"} style={{ background:"#09090b", border:"1px solid var(--border)", borderRadius:"12px", padding:"22px 22px 20px", display:"flex", flexDirection:"column" as const, gap:"14px", transition:"border-color 0.2s", ...s }}>
+    <div ref={ref} className={v?"bcard bcard-in":"bcard"} style={{ background:"#09090b", border:"1px solid var(--border)", borderRadius:"14px", padding:"26px 26px 24px", display:"flex", flexDirection:"column" as const, gap:"18px", transition:"border-color 0.2s", ...s }}>
       <div>
-        <div style={{ fontSize:"10px", fontFamily:"monospace", color:"var(--text-tertiary)", marginBottom:"8px", letterSpacing:"0.5px" }}>{num}</div>
-        <div style={{ fontSize:"15px", fontWeight:700, marginBottom:"8px", color:"var(--text-primary)" }}>{title}</div>
-        <p style={{ fontSize:"13px", color:"var(--text-tertiary)", lineHeight:1.7, margin:0 }}>{body}</p>
+        <div style={{ fontSize:"11px", fontFamily:"monospace", color:"var(--text-tertiary)", marginBottom:"10px", letterSpacing:"0.5px" }}>{num}</div>
+        <div style={{ fontSize:"17px", fontWeight:700, marginBottom:"10px", color:"var(--text-primary)" }}>{title}</div>
+        <p style={{ fontSize:"14px", color:"var(--text-tertiary)", lineHeight:1.75, margin:0 }}>{body}</p>
       </div>
       {demo && <div style={{ marginTop:"auto" }}>{demo}</div>}
     </div>
@@ -594,7 +594,7 @@ export default function LandingPage() {
           <h2 style={{ fontSize:"clamp(20px,3.5vw,28px)", fontWeight:700, marginBottom:"40px" }}>Eleven capabilities. One install.</h2>
 
           {/* Row 1: interception (wide) + blocking */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"12px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"14px" }}>
             <BCard num="01 — control plane" title="Pre-execution interception"
               body="Every tool call routes through a synchronous check before it runs. Returns allowed: true or allowed: false. No async, no retry — the agent cannot proceed without a verdict."
               demo={<DecisionDemo />}
@@ -606,7 +606,7 @@ export default function LandingPage() {
           </div>
 
           {/* Row 2: HCS (wide) + recovery */}
-          <div style={{ display:"grid", gridTemplateColumns:"3fr 2fr", gap:"12px", marginBottom:"12px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"3fr 2fr", gap:"14px", marginBottom:"14px" }}>
             <BCard num="03 — hedera" title="AES-256-GCM encrypted HCS audit"
               body="Every action encrypted with a per-agent key, appended to a Hedera HCS topic, final in 3–5 seconds. The plaintext never leaves your orchestrator. Tamper-proof. Verifiable on HashScan. Independent of your infrastructure."
               demo={<HCSDemo />}
@@ -618,7 +618,7 @@ export default function LandingPage() {
           </div>
 
           {/* Row 3: earnings + vault */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"12px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"14px" }}>
             <BCard num="05 — economics" title="Automatic earnings settlement"
               body="ERC-8183 job earnings split via HTS to configurable dev/ops/reinvest wallets. Each split logged to HCS as a cryptographic pay stub. Verifiable by any party on HashScan."
               demo={<SplitDemo />}
@@ -630,7 +630,7 @@ export default function LandingPage() {
           </div>
 
           {/* Row 4: identity (wide) + reputation */}
-          <div style={{ display:"grid", gridTemplateColumns:"2fr 3fr", gap:"12px", marginBottom:"12px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"2fr 3fr", gap:"14px", marginBottom:"14px" }}>
             <BCard num="07 — reputation" title="ERC-8004 on-chain reputation"
               body="Reputation score starts at 500. Each blocked action deducts 5 points on-chain. Score lives in the AgentIdentity contract — any other agent or marketplace can read it."
               demo={<ReputationDemo />}
@@ -642,7 +642,7 @@ export default function LandingPage() {
           </div>
 
           {/* Row 5: telegram + policies + webhooks */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"12px", marginBottom:"12px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"14px", marginBottom:"14px" }}>
             <BCard num="09 — alerts" title="Telegram kill-switch"
               body="/block, /unblock, /agents, /logs, /status, /memory — manage any agent from a Telegram message. Quarantine fires in seconds."
               demo={<TelegramDemo />}
@@ -654,12 +654,15 @@ export default function LandingPage() {
             <BCard num="11 — alerts" title="HTTP webhook delivery"
               body="Register URLs to receive POST notifications on blocked or high-risk events. Filter by event type. Payload includes the full event with HCS topic link. Fires within 5 seconds."
               demo={
-                <div style={{ fontFamily:"monospace", fontSize:"12px", lineHeight:1.85, color:"var(--text-tertiary)" }}>
-                  <div style={{ color:"#818cf8" }}>POST /api/monitor/agent/:id/webhook</div>
-                  <div style={{ marginTop:"8px" }}>event: <span style={{ color:"#10b981" }}>"blocked"</span></div>
-                  <div>agentId: <span style={{ color:"#a3a3a3" }}>"rogue-bot"</span></div>
-                  <div>hcsTopicId: <span style={{ color:"#a3a3a3" }}>"0.0.8228693"</span></div>
-                  <div style={{ color:"#444", marginTop:"4px" }}>fires &lt;5s · event-type filter</div>
+                <div className="ademo">
+                  <div className="ademo-label">webhook delivery</div>
+                  <div style={{ fontFamily:"monospace", fontSize:"13px", lineHeight:2, color:"var(--text-tertiary)" }}>
+                    <div style={{ color:"#818cf8" }}>POST /agent/:id/webhook</div>
+                    <div>event: <span style={{ color:"#10b981" }}>"blocked"</span></div>
+                    <div>agentId: <span style={{ color:"#a3a3a3" }}>"rogue-bot"</span></div>
+                    <div>hcsTopicId: <span style={{ color:"#a3a3a3" }}>"0.0.8228693"</span></div>
+                    <div style={{ color:"#444" }}>fires &lt;5s · event-type filter</div>
+                  </div>
                 </div>
               }
             />
@@ -750,8 +753,11 @@ export default function LandingPage() {
         .ademo {
           background: #0d0d0f;
           border: 1px solid rgba(255,255,255,0.06);
-          border-radius: 7px;
-          padding: 12px 14px;
+          border-radius: 8px;
+          padding: 14px 16px;
+          height: 170px;
+          overflow: hidden;
+          flex-shrink: 0;
         }
         .ademo-label {
           font-family: monospace;
@@ -759,8 +765,8 @@ export default function LandingPage() {
           color: var(--text-tertiary);
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          margin-bottom: 9px;
-          padding-bottom: 7px;
+          margin-bottom: 10px;
+          padding-bottom: 8px;
           border-bottom: 1px solid rgba(255,255,255,0.04);
         }
 
