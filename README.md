@@ -100,6 +100,16 @@ Five reference agent implementations showing common integration patterns. All re
 | AgentMarketplace | `0x46e12242aEa85a1fa2EA5C769cd600fA64A434C6` | `0.0.7992397` | ERC-8183 job lifecycle (used by reference agents) |
 | ContentRegistry | `0x031bbBBCCe16EfBb289b3f6059996D0e9Bba5BcC` | — | Content anchoring (legacy, not used by core product) |
 
+### Deployed Contracts (Celo Sepolia Testnet)
+
+Same contracts deployed on Celo for multi-chain agent identity and marketplace support.
+
+| Contract | EVM Address | CeloScan |
+|----------|-------------|----------|
+| AgentIdentity | `0xF20bD9F3a66E2A11090C3cCc645368543873E270` | [View ↗](https://celo-sepolia.celoscan.io/address/0xF20bD9F3a66E2A11090C3cCc645368543873E270) |
+| AgentMarketplace | `0xd8b68F31294e2D346810Bf3e3cD77593348BB89e` | [View ↗](https://celo-sepolia.celoscan.io/address/0xd8b68F31294e2D346810Bf3e3cD77593348BB89e) |
+| ContentRegistry | `0x9a9B2E9D436Fd6d1DEf6C1689786A5588BAf26e3` | [View ↗](https://celo-sepolia.celoscan.io/address/0x9a9B2E9D436Fd6d1DEf6C1689786A5588BAf26e3) |
+
 ---
 
 ## Reputation System

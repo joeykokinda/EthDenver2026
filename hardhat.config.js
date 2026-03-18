@@ -16,8 +16,8 @@ module.exports = {
         : []
     },
     celo: {
-      url: "https://alfajores-forno.celo-testnet.org",
-      chainId: 44787,
+      url: "https://celo-sepolia.drpc.org",
+      chainId: 11142220,
       accounts: process.env.DEPLOYER_PRIVATE_KEY
         ? [process.env.DEPLOYER_PRIVATE_KEY]
         : []
