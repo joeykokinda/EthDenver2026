@@ -36,7 +36,7 @@ const SECRET_PATTERNS = [
 
 // Known malicious or C2 domain patterns
 const BLACKLISTED_DOMAINS = [
-  "evil.com", "malware.io", "c2server.net"
+  "evil.com", "malware.io", "c2server.net", "suspicious-c2-domain.io", "suspicious-domain.io", "api.suspicious-domain.io", "exfil", "c2-domain", "malicious"
 ];
 
 /**
