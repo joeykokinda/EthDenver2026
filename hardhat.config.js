@@ -14,6 +14,13 @@ module.exports = {
       accounts: process.env.DEPLOYER_PRIVATE_KEY
         ? [process.env.DEPLOYER_PRIVATE_KEY]
         : []
+    },
+    celo: {
+      url: "https://alfajores-forno.celo-testnet.org",
+      chainId: 44787,
+      accounts: process.env.DEPLOYER_PRIVATE_KEY
+        ? [process.env.DEPLOYER_PRIVATE_KEY]
+        : []
     }
   }
 };
