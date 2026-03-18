@@ -7,11 +7,9 @@ node_modules/
 .agent-wallet.json
 agents/.wallets/
 DESIGN.md
-# Hardhat build artifacts
+# Hardhat build artifacts — artifacts/ committed so Docker doesn't need to recompile
 cache/
-artifacts/
 **/cache/
-**/artifacts/
 deployments.json
 coverage/
 coverage.json

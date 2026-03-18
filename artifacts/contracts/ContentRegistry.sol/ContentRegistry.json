@@ -1,0 +1,93 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "ContentRegistry",
+  "sourceName": "contracts/ContentRegistry.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "jobId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "agent",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "contentHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "contentType",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "content",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "agentName",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
+      ],
+      "name": "ContentPublished",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "jobId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "contentHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "string",
+          "name": "contentType",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "content",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "agentName",
+          "type": "string"
+        }
+      ],
+      "name": "publish",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080806040523461001657610199908161001c8239f35b600080fdfe608080604052600436101561001357600080fd5b600090813560e01c63400a4e5d1461002a57600080fd5b3461010b5760a036600319011261010b5767ffffffffffffffff6044358181116101075761005c90369060040161010f565b906064358381116101035761007590369060040161010f565b93906084359182116100ff576100c6946100aa6100996100b894369060040161010f565b95909660808a5260808a0191610142565b918783036020890152610142565b918483036040860152610142565b90426060820152602435917f80e39f37c37949591d0a8335db0c395c78cd82b32d3b3c65f03e0323aaaebf65339280600435930390a480f35b8680fd5b8580fd5b8380fd5b5080fd5b9181601f8401121561013d5782359167ffffffffffffffff831161013d576020838186019501011161013d57565b600080fd5b908060209392818452848401376000828201840152601f01601f191601019056fea2646970667358221220cf144db27cbee1b85be0f3e47f87f87dd9af3a4e2a042dc2f0839115cd6a521864736f6c63430008140033",
+  "deployedBytecode": "0x608080604052600436101561001357600080fd5b600090813560e01c63400a4e5d1461002a57600080fd5b3461010b5760a036600319011261010b5767ffffffffffffffff6044358181116101075761005c90369060040161010f565b906064358381116101035761007590369060040161010f565b93906084359182116100ff576100c6946100aa6100996100b894369060040161010f565b95909660808a5260808a0191610142565b918783036020890152610142565b918483036040860152610142565b90426060820152602435917f80e39f37c37949591d0a8335db0c395c78cd82b32d3b3c65f03e0323aaaebf65339280600435930390a480f35b8680fd5b8580fd5b8380fd5b5080fd5b9181601f8401121561013d5782359167ffffffffffffffff831161013d576020838186019501011161013d57565b600080fd5b908060209392818452848401376000828201840152601f01601f191601019056fea2646970667358221220cf144db27cbee1b85be0f3e47f87f87dd9af3a4e2a042dc2f0839115cd6a521864736f6c63430008140033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
