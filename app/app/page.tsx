@@ -337,37 +337,47 @@ function TelegramDemo() {
   );
 }
 
-// Reputation
+// Reputation — dual-score: reputation (jobs) + safety (blocks)
 function ReputationDemo() {
-  const EVENTS = [
-    { delay:800,  score:495, text:"shell_exec blocked  −5" },
-    { delay:2000, score:490, text:"curl|bash blocked   −5" },
-    { delay:3200, score:485, text:"priv escalation     −5" },
-  ];
-  const [score, setScore] = useState(500);
-  const [evts,  setEvts]  = useState<string[]>([]);
+  // Phase 0: idle. Phase 1-3: job events (+rep). Phase 4-5: block events (-safety).
+  const [rep,    setRep]    = useState(500);
+  const [safety, setSafety] = useState(1000);
+  const [evts,   setEvts]   = useState<{text:string; color:string}[]>([]);
   const [tick, setTick] = useState(0);
-  useEffect(()=>{ const iv=setInterval(()=>setTick(t=>t+1),6200); return()=>clearInterval(iv); },[]);
+  useEffect(()=>{ const iv=setInterval(()=>setTick(t=>t+1),7000); return()=>clearInterval(iv); },[]);
   useEffect(()=>{
-    setScore(500); setEvts([]);
-    const ts = EVENTS.map(e=>setTimeout(()=>{ setScore(e.score); setEvts(v=>[...v,e.text].slice(-3)); }, e.delay));
+    setRep(500); setSafety(1000); setEvts([]);
+    const SEQ:[number,()=>void][] = [
+      [600,  ()=>{ setRep(510);  setEvts([{ text:"job completed on-time  +10", color:"#10b981" }]); }],
+      [1800, ()=>{ setRep(520);  setEvts(v=>[...v,{ text:"five-star rating        +20", color:"#10b981" }].slice(-3)); setRep(530); }],
+      [1900, ()=>{ setRep(540); }],
+      [3200, ()=>{ setSafety(995); setEvts(v=>[...v,{ text:"shell_exec blocked       −5", color:"#ef4444" }].slice(-3)); }],
+      [4400, ()=>{ setSafety(990); setEvts(v=>[...v,{ text:"curl|bash blocked        −5", color:"#ef4444" }].slice(-3)); }],
+    ];
+    const ts = SEQ.map(([d,fn])=>setTimeout(fn,d));
     return()=>ts.forEach(clearTimeout);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[tick]);
-  const pct = score/1000;
   return (
     <div className="ademo">
-      <div className="ademo-label">ERC-8004 reputation</div>
-      <div style={{ fontFamily:"monospace", fontSize:"13px", lineHeight:2 }}>
-        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"4px" }}>
-          <span style={{ color:"var(--text-tertiary)" }}>rogue-bot-demo</span>
-          <span style={{ color:score>480?"#f59e0b":"#ef4444", fontWeight:700, transition:"color 0.3s" }}>{score} / 1000</span>
+      <div className="ademo-label">reputation + safety (dual score)</div>
+      <div style={{ fontFamily:"monospace", fontSize:"12px" }}>
+        {/* Reputation bar */}
+        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"2px" }}>
+          <span style={{ color:"var(--text-tertiary)" }}>Reputation <span style={{ color:"#444", fontSize:"10px" }}>(job outcomes)</span></span>
+          <span style={{ color: rep>=600?"#10b981":rep>=400?"#f59e0b":"#ef4444", fontWeight:700, transition:"color 0.3s" }}>{rep}</span>
         </div>
-        <div style={{ height:"5px", background:"#1a1a1a", borderRadius:"3px", overflow:"hidden", marginBottom:"8px" }}>
-          <div style={{ height:"100%", width:`${pct*100}%`, background:score>480?"#f59e0b":"#ef4444", borderRadius:"3px", transition:"width 0.6s ease" }}/>
+        <div style={{ height:"4px", background:"#1a1a1a", borderRadius:"3px", overflow:"hidden", marginBottom:"7px" }}>
+          <div style={{ height:"100%", width:`${rep/10}%`, background:rep>=600?"#10b981":"#f59e0b", borderRadius:"3px", transition:"width 0.6s ease" }}/>
         </div>
-        {evts.map((e,i)=><div key={i} className="la" style={{ color:"#ef4444" }}>— {e}</div>)}
-        <div style={{ color:"#333", fontSize:"11px", marginTop:"4px" }}>AgentIdentity contract · on-chain</div>
+        {/* Safety bar */}
+        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"2px" }}>
+          <span style={{ color:"var(--text-tertiary)" }}>Safety <span style={{ color:"#444", fontSize:"10px" }}>(block history)</span></span>
+          <span style={{ color: safety>=900?"#10b981":safety>=600?"#f59e0b":"#ef4444", fontWeight:700, transition:"color 0.3s" }}>{safety}</span>
+        </div>
+        <div style={{ height:"4px", background:"#1a1a1a", borderRadius:"3px", overflow:"hidden", marginBottom:"8px" }}>
+          <div style={{ height:"100%", width:`${safety/10}%`, background:safety>=900?"#10b981":"#f59e0b", borderRadius:"3px", transition:"width 0.6s ease" }}/>
+        </div>
+        {evts.map((e,i)=><div key={i} className="la" style={{ color:e.color, fontSize:"11px" }}>— {e.text}</div>)}
       </div>
     </div>
   );
@@ -631,8 +641,8 @@ export default function LandingPage() {
 
           {/* Row 4: identity (wide) + reputation */}
           <div style={{ display:"grid", gridTemplateColumns:"2fr 3fr", gap:"14px", marginBottom:"14px" }}>
-            <BCard num="07 — reputation" title="ERC-8004 on-chain reputation"
-              body="Reputation score starts at 500. Each blocked action deducts 5 points on-chain. Score lives in the AgentIdentity contract — any other agent or marketplace can read it."
+            <BCard num="07 — reputation" title="Dual-score trust: reputation + safety"
+              body="Two independent signals. Reputation (0–1000) tracks job delivery: +10 on-time, +20 five-star, −15 abandoned. Safety (0–1000) tracks policy behavior: −5 per blocked action. Both exposed at /v2/agent/:id/trust for agent-to-agent trust checks."
               demo={<ReputationDemo />}
             />
             <BCard num="08 — identity" title="Challenge-response proof + auto-wallet"

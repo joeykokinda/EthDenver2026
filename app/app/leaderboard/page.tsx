@@ -21,7 +21,9 @@ interface AgentRow {
   totalEarned: number;
   activeAlerts: number;
   created_at: number;
-  // from chain
+  // from DB
+  safetyScore?: number;
+  // from chain (ERC-8004)
   reputationScore?: number;
   verifiedMachineAgent?: boolean;
   jobsCompleted?: number;
@@ -63,6 +65,7 @@ export default function LeaderboardPage() {
           };
         } catch { return agent; }
       }));
+      // safetyScore comes from the DB (already in the leaderboard API response)
 
       // Sort by rep score if available, else by totalActions
       enriched.sort((a, b) => {
@@ -160,7 +163,8 @@ export default function LeaderboardPage() {
               }}>
                 <div>#</div>
                 <div>Agent</div>
-                <div style={{ textAlign: "center" }}>Rep Score</div>
+                <div style={{ textAlign: "center" }}>Reputation</div>
+                <div className="lb-col-safety" style={{ textAlign: "center" }}>Safety</div>
                 <div style={{ textAlign: "center" }}>Actions</div>
                 <div className="lb-col-blocked" style={{ textAlign: "center" }}>Blocked</div>
                 <div className="lb-col-earned" style={{ textAlign: "center" }}>Earned</div>
@@ -220,7 +224,7 @@ export default function LeaderboardPage() {
                       </div>
                     </div>
 
-                    {/* Rep score */}
+                    {/* Reputation score (job delivery, from ERC-8004 chain) */}
                     <div style={{ textAlign: "center" }}>
                       {agent.reputationScore !== undefined ? (
                         <span style={{ fontSize: "20px", fontWeight: "700", fontFamily: "monospace", color: repColor }}>
@@ -229,6 +233,23 @@ export default function LeaderboardPage() {
                       ) : (
                         <span style={{ fontSize: "12px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>—</span>
                       )}
+                      <div style={{ fontSize: "9px", color: "var(--text-tertiary)", marginTop: "2px" }}>jobs</div>
+                    </div>
+
+                    {/* Safety score (block behavior, from DB) */}
+                    <div className="lb-col-safety" style={{ textAlign: "center" }}>
+                      {(() => {
+                        const s = agent.safetyScore ?? 1000;
+                        const sc = s >= 900 ? "#10b981" : s >= 600 ? "#f59e0b" : "#ef4444";
+                        return (
+                          <>
+                            <span style={{ fontSize: "20px", fontWeight: "700", fontFamily: "monospace", color: sc }}>
+                              {s}
+                            </span>
+                            <div style={{ fontSize: "9px", color: "var(--text-tertiary)", marginTop: "2px" }}>blocks</div>
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Total actions */}
@@ -278,23 +299,29 @@ export default function LeaderboardPage() {
       <style>{`
   .lb-header, .lb-row {
     display: grid;
-    grid-template-columns: 40px 1fr 120px 100px 100px 90px 80px;
+    grid-template-columns: 40px 1fr 110px 110px 100px 100px 90px 80px;
     gap: 12px;
     padding: 10px 20px;
     align-items: center;
   }
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
     .lb-header, .lb-row {
-      grid-template-columns: 28px 1fr 80px 70px;
+      grid-template-columns: 28px 1fr 90px 90px 70px;
     }
     .lb-col-blocked, .lb-col-earned, .lb-col-hcs { display: none; }
   }
-  @media (max-width: 480px) {
+  @media (max-width: 600px) {
     .lb-header, .lb-row {
-      grid-template-columns: 28px 1fr 70px;
+      grid-template-columns: 28px 1fr 80px 80px;
       padding: 10px 12px;
     }
     .lb-col-actions { display: none; }
+  }
+  @media (max-width: 420px) {
+    .lb-header, .lb-row {
+      grid-template-columns: 28px 1fr 70px;
+    }
+    .lb-col-safety { display: none; }
   }
 `}</style>
     </>

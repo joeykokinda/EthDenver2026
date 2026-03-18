@@ -23,6 +23,8 @@ interface Stats {
   blockedActions: number;
   highRiskActions: number;
   totalEarned: number;
+  reputationScore?: number;
+  safetyScore?: number;
 }
 
 interface Log {
@@ -598,6 +600,32 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
           </div>
 
           <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+            {/* Reputation score — job delivery track record */}
+            {stats && (
+              <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "6px", padding: "6px 12px", display: "flex", gap: "8px", alignItems: "center" }}>
+                <span style={{
+                  fontSize: "14px", fontWeight: 700, fontFamily: "monospace",
+                  color: (stats.reputationScore ?? 500) >= 700 ? "#10b981" : (stats.reputationScore ?? 500) >= 400 ? "#f59e0b" : "#ef4444"
+                }}>
+                  {stats.reputationScore ?? 500}
+                </span>
+                <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>Reputation</span>
+                <span style={{ fontSize: "10px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>(jobs)</span>
+              </div>
+            )}
+            {/* Safety score — block behavior track record */}
+            {stats && (
+              <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "6px", padding: "6px 12px", display: "flex", gap: "8px", alignItems: "center" }}>
+                <span style={{
+                  fontSize: "14px", fontWeight: 700, fontFamily: "monospace",
+                  color: (stats.safetyScore ?? 1000) >= 900 ? "#10b981" : (stats.safetyScore ?? 1000) >= 600 ? "#f59e0b" : "#ef4444"
+                }}>
+                  {stats.safetyScore ?? 1000}
+                </span>
+                <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>Safety</span>
+                <span style={{ fontSize: "10px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>(blocks)</span>
+              </div>
+            )}
             {[
               { label: "Actions today", value: stats?.actionsToday ?? 0, color: "var(--accent)" },
               { label: "Blocked", value: stats?.blockedActions ?? 0, color: (stats?.blockedActions ?? 0) > 0 ? "#ef4444" : "var(--text-tertiary)" },

@@ -533,7 +533,7 @@ module.exports = {
   // agents
   upsertAgent, getAgent, getAgentsByOwner, getAllAgents, findAgentByWallet,
   // logs
-  insertLog, getAgentLogs, getRecentLogs, getAgentStats, decrementReputation,
+  insertLog, getAgentLogs, getRecentLogs, getAgentStats, decrementReputation, updateReputationFromJob, updateSafetyScore,
   // alerts
   insertAlert, getAgentAlerts, resolveAlert, getActiveAlertCount,
   // policies

@@ -14,7 +14,7 @@ require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 // Veridex trust layer modules
 const db = require("./veridex-db");
 const { checkBlocking, assessRisk, decodeAction } = require("./blocking");
-const { getAgentSplitConfig, setAgentSplitConfig, decrementReputation } = db;
+const { getAgentSplitConfig, setAgentSplitConfig, decrementReputation, updateReputationFromJob, updateSafetyScore } = db;
 const { createAgentTopic, writeToHCS, decryptHcsMessage, topicHashScanUrl } = require("./hcs-logger");
 const { randomBytes } = require("crypto");
 const { sendAlert } = require("./telegram");
@@ -394,8 +394,8 @@ app.post("/api/log", async (req, res) => {
       }
     });
 
-    // Decrement reputation score in DB (-5 per blocked action, floor 0)
-    decrementReputation(agentId, 5);
+    // Penalize safety score (-5 per blocked action). Reputation is job-outcomes only.
+    updateSafetyScore(agentId, -5);
 
     // Attempt on-chain reportAgent via registryAuthority (fire-and-forget)
     if (registryAuthority && agentRecord.owner_wallet) {
@@ -897,6 +897,8 @@ app.get("/api/leaderboard", (req, res) => {
       totalActions: stats.totalActions,
       blockedActions: stats.blockedActions,
       totalEarned: stats.totalEarned,
+      reputationScore: stats.reputationScore,
+      safetyScore: stats.safetyScore,
       activeAlerts: db.getActiveAlertCount(a.id),
       created_at: a.created_at,
     };
@@ -1128,6 +1130,103 @@ app.get("/v2/jobs", (req, res) => {
  */
 app.get("/v2/jobs/agent/:agentAddress", (req, res) => {
   res.json({ jobs: getAgentJobs(req.params.agentAddress) });
+});
+
+/**
+ * POST /v2/agent/:agentId/job-outcome
+ * Report a job outcome to update reputation score (job-delivery track record).
+ * Body: { outcome: "completed"|"completed_late"|"abandoned"|"disputed"|"five_star"|"one_star", jobId? }
+ *
+ * Reputation deltas (ERC-8183 outcomes):
+ *   completed      +10  (delivered on time)
+ *   completed_late  +3  (delivered late)
+ *   abandoned      -15  (agent dropped the job)
+ *   disputed        -5  (client raised a dispute)
+ *   five_star      +20  (exceptional rating)
+ *   one_star       -20  (poor rating)
+ */
+app.post("/v2/agent/:agentId/job-outcome", (req, res) => {
+  const { agentId } = req.params;
+  const { outcome, jobId } = req.body;
+  const agent = db.getAgent(agentId);
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+
+  const DELTAS = {
+    completed:      +10,
+    completed_late:  +3,
+    abandoned:      -15,
+    disputed:        -5,
+    five_star:      +20,
+    one_star:       -20,
+  };
+  if (!(outcome in DELTAS)) {
+    return res.status(400).json({
+      error: "Invalid outcome",
+      valid: Object.keys(DELTAS),
+    });
+  }
+
+  updateReputationFromJob(agentId, DELTAS[outcome]);
+  const stats = db.getAgentStats(agentId);
+  console.log(`[reputation] ${agentId} job-outcome=${outcome} delta=${DELTAS[outcome] > 0 ? "+" : ""}${DELTAS[outcome]} → rep=${stats.reputationScore}`);
+  res.json({ success: true, outcome, delta: DELTAS[outcome], reputationScore: stats.reputationScore, safetyScore: stats.safetyScore });
+});
+
+/**
+ * GET /v2/agent/:agentId/trust
+ * Returns both reputation (job delivery) and safety (block history) scores with
+ * plain-English summaries for agent-to-agent or client trust checks.
+ */
+app.get("/v2/agent/:agentId/trust", (req, res) => {
+  const { agentId } = req.params;
+  const agent = db.getAgent(agentId);
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+
+  const stats = db.getAgentStats(agentId);
+  const rep   = stats.reputationScore;
+  const safe  = stats.safetyScore;
+
+  const repLabel = rep >= 800 ? "Excellent" : rep >= 600 ? "Good" : rep >= 400 ? "Fair" : rep >= 200 ? "Poor" : "Critical";
+  const safeLabel = safe >= 900 ? "Clean" : safe >= 700 ? "Low risk" : safe >= 500 ? "Moderate risk" : safe >= 300 ? "High risk" : "Untrusted";
+
+  const repSummary = rep >= 800
+    ? "Strong job delivery record — consistently completes work on time."
+    : rep >= 600
+    ? "Solid job delivery — mostly on-time with few issues."
+    : rep >= 400
+    ? "Mixed job history — some late or disputed deliveries."
+    : rep >= 200
+    ? "Poor delivery record — frequent abandonment or disputes."
+    : "Critically low reputation — history of failed or disputed jobs.";
+
+  const safeSummary = safe >= 900
+    ? "No blocked actions detected — fully within policy."
+    : safe >= 700
+    ? "Few blocked actions — operating within acceptable bounds."
+    : safe >= 500
+    ? "Moderate block history — review agent policies."
+    : safe >= 300
+    ? "Frequent policy violations — high-risk agent."
+    : "Severely restricted — repeated policy violations.";
+
+  res.json({
+    agentId,
+    name: agent.name,
+    reputation: {
+      score: rep,
+      label: repLabel,
+      summary: repSummary,
+      basis: "ERC-8183 job outcomes: completions, abandonments, disputes, ratings",
+    },
+    safety: {
+      score: safe,
+      label: safeLabel,
+      summary: safeSummary,
+      basis: "Veridex pre-execution policy checks: blocked actions",
+      blockedActions: stats.blockedActions,
+    },
+    overallTrust: Math.round((rep * 0.6) + (safe * 0.4)),
+  });
 });
 
 // ── Layer 8: Verifiable Operational History (Tamper-Proof Agent Memory) ───────
@@ -1493,6 +1592,8 @@ app.listen(PORT, () => {
   console.log(`\n── Job Monitor (Layer 4) ─────────────────────────`);
   console.log(`   GET  /v2/jobs                    - All recent ERC-8183 jobs`);
   console.log(`   GET  /v2/jobs/agent/:address     - Jobs for agent wallet`);
+  console.log(`   POST /v2/agent/:id/job-outcome   - Report job outcome → update reputation`);
+  console.log(`   GET  /v2/agent/:id/trust         - Dual reputation+safety scores with summaries`);
   console.log(`\n── Verifiable Memory (Layer 8) ───────────────────`);
   console.log(`   GET  /v2/agent/:id/memory        - Tamper-proof startup context from HCS`);
   console.log(`\nReady.\n`);
