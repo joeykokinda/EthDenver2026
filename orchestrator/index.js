@@ -1327,7 +1327,7 @@ async function fireWebhooks(agentId, eventType, payload) {
 }
 
 // Start server
-const PORT = process.env.ORCHESTRATOR_PORT || 3001;
+const PORT = process.env.PORT || process.env.ORCHESTRATOR_PORT || 3001;
 app.listen(PORT, () => {
   // Start ERC-8183 job monitor in background
   startJobMonitor(broadcastLiveEvent).catch(e => console.error("[JobMonitor] Start error:", e.message));
