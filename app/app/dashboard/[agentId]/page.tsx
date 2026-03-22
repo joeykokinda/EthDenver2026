@@ -15,6 +15,7 @@ interface Agent {
   owner_wallet?: string;
   created_at: number;
   telegram_chat_id?: string;
+  visibility?: string;
 }
 
 interface Stats {
@@ -217,6 +218,9 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
   const [renaming, setRenaming] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [visibility, setVisibility] = useState<"public"|"private">("public");
+  const [visibilitySaving, setVisibilitySaving] = useState(false);
+  const [visibilitySaved, setVisibilitySaved] = useState(false);
 
   // Delegations tab
   const [delegations, setDelegations] = useState<Delegation[]>([]);
@@ -308,11 +312,12 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
     if (tab === "recovery") fetchMemory();
   }, [tab, fetchMemory]);
 
-  // Sync agent name and telegram_chat_id into local state when agent loads
+  // Sync agent name, telegram_chat_id, and visibility into local state when agent loads
   useEffect(() => {
     if (agent?.name) setNewName(agent.name);
     if (agent?.telegram_chat_id) setTelegramChatId(agent.telegram_chat_id);
-  }, [agent?.name, agent?.telegram_chat_id]);
+    if (agent?.visibility) setVisibility(agent.visibility as "public"|"private");
+  }, [agent?.name, agent?.telegram_chat_id, agent?.visibility]);
 
   // Fetch split config when earnings tab is active
   useEffect(() => {
@@ -373,6 +378,22 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
   }
 
   // ─── Settings actions ─────────────────────────────────────────────────────────
+
+  async function saveVisibility(v: "public"|"private") {
+    setVisibility(v);
+    setVisibilitySaving(true);
+    try {
+      await fetch(`/api/proxy/v2/agent/${encodeURIComponent(decodedId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visibility: v }),
+      });
+      setVisibilitySaved(true);
+      setTimeout(() => setVisibilitySaved(false), 2000);
+      fetchData();
+    } catch {}
+    setVisibilitySaving(false);
+  }
 
   async function renameAgent() {
     if (!newName.trim()) return;
@@ -1374,6 +1395,33 @@ const memory = await r.json();
               >
                 Export JSON
               </button>
+            </div>
+
+            {/* Visibility */}
+            <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "20px" }}>
+              <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>Visibility</div>
+              <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "16px" }}>
+                Controls whether this agent appears on the public leaderboard and whether its trust score is queryable without an API key.
+              </div>
+              <div style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
+                {(["public","private"] as const).map(v => (
+                  <button key={v} onClick={() => saveVisibility(v)} disabled={visibilitySaving} style={{
+                    flex: 1, padding: "10px 14px", borderRadius: "7px", fontSize: "13px", fontWeight: 600,
+                    cursor: "pointer", border: "1px solid",
+                    background: visibility === v ? (v === "public" ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.06)") : "transparent",
+                    borderColor: visibility === v ? (v === "public" ? "#10b981" : "rgba(255,255,255,0.2)") : "var(--border)",
+                    color: visibility === v ? (v === "public" ? "#10b981" : "var(--text-primary)") : "var(--text-tertiary)",
+                  }}>
+                    {v === "public" ? "🌐 Public" : "🔒 Private"}
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--text-tertiary)", lineHeight: 1.6 }}>
+                {visibility === "public"
+                  ? "Appears on leaderboard. Trust score queryable by anyone. Other agents can discover and hire this agent."
+                  : "Hidden from leaderboard. Trust score requires your API key. Use for internal agents and compliance logging."}
+              </div>
+              {visibilitySaved && <div style={{ fontSize: "12px", color: "#10b981", marginTop: "8px" }}>✓ Saved</div>}
             </div>
 
             {/* Danger zone */}

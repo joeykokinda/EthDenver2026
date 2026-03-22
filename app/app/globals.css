@@ -462,6 +462,15 @@ a:hover {
   .rules-grid {
     grid-template-columns: 1fr !important;
   }
+
+  .hero-split {
+    grid-template-columns: 1fr !important;
+    gap: 40px !important;
+  }
+
+  .use-case-split {
+    grid-template-columns: 1fr !important;
+  }
   
   .stats-grid {
     grid-template-columns: 1fr;

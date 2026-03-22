@@ -26,12 +26,15 @@ const DANGEROUS_SHELL_PATTERNS = [
 
 // Secret / credential leak patterns in params or results
 const SECRET_PATTERNS = [
-  { pattern: /sk_live_[a-zA-Z0-9]+/,     label: "Stripe live secret key" },
-  { pattern: /sk_test_[a-zA-Z0-9]+/,     label: "Stripe test secret key" },
-  { pattern: /AKIA[0-9A-Z]{16}/,         label: "AWS access key" },
-  { pattern: /-----BEGIN.*PRIVATE KEY/,  label: "Private key material" },
-  { pattern: /Bearer\s+[a-zA-Z0-9_-]{20,}/, label: "Bearer token" },
-  { pattern: /password\s*[:=]\s*\S{8,}/i,  label: "Password in plaintext" },
+  { pattern: /sk_live_[a-zA-Z0-9]+/,          label: "Stripe live secret key" },
+  { pattern: /sk_test_[a-zA-Z0-9]+/,          label: "Stripe test secret key" },
+  { pattern: /sk-[a-zA-Z0-9_-]{20,}/,         label: "API secret key (sk- prefix)" },
+  { pattern: /AKIA[0-9A-Z]{16}/,              label: "AWS access key" },
+  { pattern: /-----BEGIN.*PRIVATE KEY/,        label: "Private key material" },
+  { pattern: /0x[a-f0-9]{64}/i,               label: "Ethereum private key (hex)" },
+  { pattern: /privatekey/i,                    label: "Private key reference" },
+  { pattern: /Bearer\s+[a-zA-Z0-9_-]{20,}/,   label: "Bearer token" },
+  { pattern: /password\s*[:=]\s*\S{8,}/i,     label: "Password in plaintext" },
 ];
 
 // Known malicious or C2 domain patterns

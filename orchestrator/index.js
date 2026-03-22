@@ -936,7 +936,7 @@ app.post("/api/monitor/agent/:agentId/split-config", (req, res) => {
  * All agents sorted by total actions, with stats for leaderboard display.
  */
 app.get("/api/leaderboard", (req, res) => {
-  const agents = db.getAllAgents();
+  const agents = db.getPublicAgents();
   const rows = agents.map(a => {
     const stats = db.getAgentStats(a.id);
     return {
@@ -948,13 +948,16 @@ app.get("/api/leaderboard", (req, res) => {
       totalActions: stats.totalActions,
       blockedActions: stats.blockedActions,
       totalEarned: stats.totalEarned,
-      reputationScore: stats.reputationScore,
       safetyScore: stats.safetyScore,
       activeAlerts: db.getActiveAlertCount(a.id),
+      visibility: a.visibility || "public",
       created_at: a.created_at,
     };
   }).sort((a, b) => b.totalActions - a.totalActions);
-  res.json({ agents: rows });
+  res.json({
+    agents: rows,
+    _note: "Trust scores are derived from each agent's Hedera HCS topic — independently verifiable. Query /v2/agent/:id/trust for live scores.",
+  });
 });
 
 /**
@@ -1234,6 +1237,14 @@ app.get("/v2/agent/:agentId/trust", async (req, res) => {
   const agent = db.getAgent(agentId);
   if (!agent) return res.status(404).json({ error: "Agent not found" });
 
+  // Private agents require the operator's apiKey
+  if (agent.visibility === "private") {
+    const supplied = req.headers["x-api-key"] || req.query.apiKey;
+    if (!supplied || supplied !== agent.api_key) {
+      return res.status(403).json({ error: "This agent is private. Provide the correct x-api-key header." });
+    }
+  }
+
   if (!agent.hcs_topic_id) {
     return res.status(200).json({
       agentId, name: agent.name,
@@ -1305,6 +1316,30 @@ app.get("/v2/agent/:agentId/trust", async (req, res) => {
 // ── Layer 8: Verifiable Operational History (Tamper-Proof Agent Memory) ───────
 
 /**
+ * PATCH /v2/agent/:agentId
+ * Update agent settings — currently supports: visibility ("public"|"private")
+ * Requires x-api-key header matching the agent's stored api_key.
+ */
+app.patch("/v2/agent/:agentId", (req, res) => {
+  const { agentId } = req.params;
+  const agent = db.getAgent(agentId);
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+  const supplied = req.headers["x-api-key"] || req.query.apiKey;
+  if (!supplied || supplied !== agent.api_key) {
+    return res.status(403).json({ error: "x-api-key required to update agent settings." });
+  }
+  const { visibility } = req.body || {};
+  if (visibility && !["public", "private"].includes(visibility)) {
+    return res.status(400).json({ error: "visibility must be 'public' or 'private'" });
+  }
+  if (visibility) {
+    db.getDb().prepare("UPDATE agents SET visibility = ? WHERE id = ?").run(visibility, agentId);
+  }
+  const updated = db.getAgent(agentId);
+  res.json({ updated: true, agentId, visibility: updated.visibility });
+});
+
+/**
  * GET /v2/agent/:agentId/memory
  * Reads last 50 HCS messages from Mirror Node + local DB state.
  * Returns structured context the agent should inject at startup.
@@ -1319,6 +1354,13 @@ app.get("/v2/agent/:agentId/memory", async (req, res) => {
 
   if (!agentRecord) {
     return res.status(404).json({ error: "Agent not found. Register via POST /api/agent/register-monitor first." });
+  }
+
+  if (agentRecord.visibility === "private") {
+    const supplied = req.headers["x-api-key"] || req.query.apiKey;
+    if (!supplied || supplied !== agentRecord.api_key) {
+      return res.status(403).json({ error: "This agent is private. Provide the correct x-api-key header." });
+    }
   }
 
   // ── Pull HCS history from Mirror Node ─────────────────────────────────────
@@ -1475,10 +1517,21 @@ app.post("/v2/join", async (req, res) => {
     return res.status(400).json({ error: "agentId must be 1-64 chars, letters/numbers/hyphens/underscores only" });
   }
 
-  // Upsert agent into DB (appears on leaderboard immediately)
+  const visibility = (req.body?.visibility === "private") ? "private" : "public";
+
+  // Upsert agent into DB (public agents appear on leaderboard immediately)
   let agentRecord = db.getAgent(agentId);
   if (!agentRecord) {
     db.upsertAgent({ id: agentId, name: agentId });
+    agentRecord = db.getAgent(agentId);
+  }
+  // Set visibility
+  db.getDb().prepare("UPDATE agents SET visibility = ? WHERE id = ?").run(visibility, agentId);
+
+  // Generate per-agent API key if missing
+  if (!agentRecord?.api_key) {
+    const apiKey = randomBytes(24).toString("hex");
+    db.getDb().prepare("UPDATE agents SET api_key = ? WHERE id = ?").run(apiKey, agentId);
     agentRecord = db.getAgent(agentId);
   }
 
@@ -1540,17 +1593,23 @@ app.post("/v2/join", async (req, res) => {
     }
   });
 
+  const freshRecord = db.getAgent(agentId);
   res.json({
     joined: true,
     agentId,
+    visibility,
+    apiKey: freshRecord?.api_key || null,
     hcsTopicId,
     hcsSequenceNumber: hcsSeqNumber,
     hashScanUrl:    hcsTopicId ? `https://hashscan.io/testnet/topic/${hcsTopicId}` : null,
-    leaderboardUrl: "https://veridex.sbs/leaderboard",
+    leaderboardUrl: visibility === "public" ? "https://veridex.sbs/leaderboard" : null,
     dashboardUrl:   `https://veridex.sbs/dashboard/${agentId}`,
     skillUrl:       "https://veridex.sbs/skill.md",
-    message:        `Agent "${agentId}" joined Veridex. First action written to Hedera HCS. You are on the leaderboard.`,
+    message:        visibility === "private"
+      ? `Agent "${agentId}" joined Veridex (private). Trust score requires your apiKey. Does not appear on leaderboard.`
+      : `Agent "${agentId}" joined Veridex. First action written to Hedera HCS. You are on the leaderboard.`,
     nextStep:       `POST https://veridex.sbs/api/proxy/api/log with agentId="${agentId}" before every tool call.`,
+    _note: visibility === "private" ? "Save your apiKey — it is required to read this agent's trust score." : undefined,
   });
 });
 

@@ -2,22 +2,11 @@
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { Logo } from "./components/Logo";
 import { Nav } from "./components/Nav";
 import { useWallet } from "./lib/wallet";
 
 interface OverviewStats { totalAgents: number; logsToday: number; blockedToday: number; totalHbar: number; }
-interface FeedEntry { id: string; agentId: string; agentName?: string; description: string; riskLevel: string; action: string; timestamp: number; }
-
-const DEMO_FEED: FeedEntry[] = [
-  { id:"d1", agentId:"research-bot-demo", agentName:"ResearchBot", description:'web_search "Hedera HCS throughput benchmarks"',            riskLevel:"low",     action:"web_search",     timestamp:0 },
-  { id:"d2", agentId:"trading-bot-demo",  agentName:"TradingBot",  description:"earnings_split 3.2 ℏ → dev 60% · ops 30% · reinvest 10%", riskLevel:"low",     action:"earnings_split", timestamp:0 },
-  { id:"d3", agentId:"rogue-bot-demo",    agentName:"RogueBot",    description:"shell_exec cat /etc/passwd — credential harvest",           riskLevel:"blocked", action:"shell_exec",     timestamp:0 },
-  { id:"d4", agentId:"data-bot-demo",     agentName:"DataBot",     description:"file_read /var/app/reports/quarterly.csv — 2.1MB",         riskLevel:"low",     action:"file_read",      timestamp:0 },
-  { id:"d5", agentId:"api-bot-demo",      agentName:"APIBot",      description:"api_call POST https://partner-api.io/webhook — 200 OK",    riskLevel:"low",     action:"api_call",       timestamp:0 },
-];
 const DEMO_STATS = { totalAgents: 5, logsToday: 1284, blockedToday: 17, totalHbar: 48.3 };
-const RC: Record<string,string> = { low:"#10b981", medium:"#f59e0b", high:"#ef4444", blocked:"#dc2626" };
 
 // ── hooks ─────────────────────────────────────────────────────────────────────
 function useReveal(threshold = 0.1) {
@@ -54,41 +43,45 @@ function Counter({ target, decimals=0 }: { target: number; decimals?: number }) 
   return <span ref={ref}>{val.toFixed(decimals)}</span>;
 }
 
-// ── Live feed ─────────────────────────────────────────────────────────────────
-function LiveFeed() {
-  const [entries, setEntries] = useState<FeedEntry[]>(() =>
-    DEMO_FEED.slice(0,3).map((e,i) => ({ ...e, timestamp: Date.now()-(3-i)*18000 }))
-  );
-  const [latestId, setLatestId] = useState("");
-  const idx = useRef(0);
+// ── Block story (operator perspective demo) ────────────────────────────────────
+const STORY_STEPS = [
+  { phase:"attempt",  label:"RogueBot",  action:'shell_exec cat /etc/passwd',        note:"credential harvest attempt",    color:"var(--text-tertiary)" },
+  { phase:"blocked",  label:"Veridex",   action:"BLOCKED — credential access rule",   note:"pre-execution gate fired",       color:"#ef4444" },
+  { phase:"hcs",      label:"Hedera",    action:"HCS seq #1848 written — 3.1s",       note:"tamper-proof, verifiable forever",color:"#10b981" },
+  { phase:"recover",  label:"RogueBot",  action:'web_search "quarterly earnings"',    note:"next job — unaffected",          color:"var(--text-secondary)" },
+];
+function BlockStory() {
+  const [step, setStep] = useState(-1);
+  const [tick, setTick] = useState(0);
+  useEffect(() => { const iv = setInterval(() => setTick(t=>t+1), 5600); return () => clearInterval(iv); }, []);
   useEffect(() => {
-    const iv = setInterval(() => {
-      const next = DEMO_FEED[idx.current % DEMO_FEED.length]; idx.current++;
-      const e = { ...next, id:`${next.id}-${Date.now()}`, timestamp: Date.now() };
-      setLatestId(e.id); setEntries(p => [e,...p].slice(0,3));
-    }, 3500);
-    return () => clearInterval(iv);
-  }, []);
+    setStep(-1);
+    const ts = STORY_STEPS.map((_,i) => setTimeout(() => setStep(i), 600 + i * 1100));
+    return () => ts.forEach(clearTimeout);
+  }, [tick]);
   return (
     <div style={{ background:"#09090b", border:"1px solid var(--border)", borderRadius:"10px", overflow:"hidden", width:"100%", maxWidth:"820px" }}>
       <div style={{ padding:"8px 14px", borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", gap:"10px", background:"#0f0f11" }}>
-        <div style={{ display:"flex", gap:"5px" }}>{["#ef4444","#f59e0b","#10b981"].map(c=><div key={c} style={{ width:9,height:9,borderRadius:"50%",background:c }}/>)}</div>
-        <span style={{ fontSize:"12px", color:"var(--text-tertiary)", fontFamily:"monospace", flex:1 }}>veridex — live agent feed</span>
-        <div style={{ display:"flex", alignItems:"center", gap:"6px" }}>
-          <div style={{ width:6,height:6,borderRadius:"50%",background:"#10b981",animation:"pulse 2s infinite" }}/>
-          <span style={{ fontSize:"11px", color:"#10b981", fontFamily:"monospace" }}>live</span>
-        </div>
+        <div style={{ display:"flex", gap:"5px" }}>{["#3f3f46","#3f3f46","#10b981"].map((c,i)=><div key={i} style={{ width:9,height:9,borderRadius:"50%",background:c }}/>)}</div>
+        <span style={{ fontSize:"12px", color:"var(--text-tertiary)", fontFamily:"monospace" }}>operator view — what happens when an agent is blocked</span>
       </div>
-      {entries.map((e,i)=>(
-        <div key={e.id} className={e.id===latestId?"feed-new":""}
-          style={{ padding:"9px 14px", borderBottom:i<2?"1px solid rgba(255,255,255,0.04)":"none", display:"flex", gap:"10px", alignItems:"center", background: e.riskLevel==="blocked"?"rgba(220,38,38,0.07)":"transparent" }}>
-          <span style={{ fontSize:"10px", fontWeight:700, padding:"2px 7px", borderRadius:"3px", fontFamily:"monospace", textTransform:"uppercase" as const, flexShrink:0, color:RC[e.riskLevel], border:`1px solid ${RC[e.riskLevel]}44`, background:`${RC[e.riskLevel]}11`, minWidth:"54px", textAlign:"center" as const }}>{e.riskLevel}</span>
-          <span style={{ fontSize:"13px", color:e.riskLevel==="blocked"?"#fca5a5":"var(--text-secondary)", fontFamily:"monospace", flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" as const }}>
-            {e.riskLevel==="blocked"&&<span style={{ color:"#ef4444" }}>⛔ </span>}{e.description}
-          </span>
-          <span style={{ fontSize:"11px", color:"var(--text-tertiary)", fontFamily:"monospace", flexShrink:0 }}>{e.agentName} · {Math.floor((Date.now()-e.timestamp)/1000)}s ago</span>
-        </div>
-      ))}
+      <div style={{ padding:"4px 0" }}>
+        {STORY_STEPS.map((s, i) => (
+          <div key={s.phase} style={{
+            padding:"10px 14px",
+            borderBottom: i < STORY_STEPS.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+            display:"flex", gap:"10px", alignItems:"center",
+            background: s.phase==="blocked" ? "rgba(220,38,38,0.06)" : s.phase==="hcs" ? "rgba(16,185,129,0.04)" : "transparent",
+            opacity: step >= i ? 1 : 0.1,
+            transition: "opacity 0.4s ease",
+          }}>
+            <span style={{ fontSize:"10px", fontFamily:"monospace", color:"var(--text-tertiary)", flexShrink:0, minWidth:"58px" }}>{s.label}</span>
+            <div style={{ width:1, height:16, background:"rgba(255,255,255,0.08)", flexShrink:0 }}/>
+            <span style={{ fontSize:"13px", fontFamily:"monospace", color: s.color, flex:1 }}>{s.action}</span>
+            <span style={{ fontSize:"11px", color:"var(--text-tertiary)", fontFamily:"monospace", flexShrink:0 }}>{s.note}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -619,6 +612,7 @@ export default function LandingPage() {
   const [demoResult, setDemoResult] = useState<DemoResult|null>(null);
   const [demoLoading, setDemoLoading] = useState(false);
   const [capExpanded, setCapExpanded] = useState(false);
+  const [heroTab, setHeroTab] = useState<"agents"|"operators">("agents");
 
   useEffect(()=>{
     const load = async () => {
@@ -665,84 +659,116 @@ export default function LandingPage() {
       <main>
 
         {/* ── HERO ─────────────────────────────────────────────────────────── */}
-        <section style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:"80px 24px" }}>
-          <div style={{ maxWidth:"820px", textAlign:"center" }}>
-            <h1 style={{ fontSize:"clamp(30px,5vw,52px)", fontWeight:800, lineHeight:1.1, letterSpacing:"-1.5px", marginBottom:"16px" }}>
-              <span style={{ color:"var(--text-primary)" }}>AI agents execute actions</span><br />
-              <span style={{ color:"#ef4444" }}>no one can independently verify.</span>
-            </h1>
-            <p style={{ fontSize:"18px", color:"#10b981", fontWeight:600, lineHeight:1.6, maxWidth:"600px", margin:"0 auto 8px" }}>
-              Veridex checks every action before it runs and writes the outcome to Hedera.
-            </p>
-            <p style={{ fontSize:"16px", color:"var(--text-tertiary)", lineHeight:1.7, maxWidth:"580px", margin:"0 auto 32px" }}>
-              Trust score is replayable by anyone from on-chain consensus.
-            </p>
-            <div style={{ display:"flex", gap:"12px", justifyContent:"center", flexWrap:"wrap", marginBottom:"28px" }}>
-              <Link href="/dashboard" style={{ background:"#10b981", borderRadius:"8px", padding:"12px 26px", fontSize:"15px", fontWeight:700, color:"#000", textDecoration:"none" }}>Open Dashboard</Link>
-              <button onClick={runDemo} disabled={demoLoading} style={{ background:"transparent", border:"1px solid #10b981", borderRadius:"8px", padding:"12px 26px", fontSize:"15px", fontWeight:600, color:"#10b981", cursor:demoLoading?"not-allowed":"pointer", opacity:demoLoading?0.6:1 }}>
-                {demoLoading ? "Running…" : "Run Live Demo"}
-              </button>
-            </div>
-            {demoResult && (
-              <div style={{ background:"rgba(16,185,129,0.05)", border:"1px solid rgba(16,185,129,0.25)", borderRadius:"10px", padding:"16px 20px", textAlign:"left", fontFamily:"monospace", fontSize:"13px", lineHeight:1.9, maxWidth:"600px", margin:"0 auto" }}>
-                <div style={{ color:"#ef4444", fontWeight:700, marginBottom:"6px" }}>⛔ Action blocked — written to Hedera HCS</div>
-                <div><span style={{ color:"var(--text-tertiary)" }}>agentId: </span><span style={{ color:"var(--text-secondary)" }}>{demoResult.agentId}</span></div>
-                <div><span style={{ color:"var(--text-tertiary)" }}>reason: </span><span style={{ color:"#fca5a5" }}>{demoResult.reason}</span></div>
-                {demoResult.hcsSequenceNumber && <div><span style={{ color:"var(--text-tertiary)" }}>hcsSeq: </span><span style={{ color:"#818cf8" }}>#{demoResult.hcsSequenceNumber}</span></div>}
-                {(demoResult.hashScanUrl || demoResult.hcsTopicId) && (
-                  <div><span style={{ color:"var(--text-tertiary)" }}>hashScanUrl: </span>
-                    <a href={demoResult.hashScanUrl || `https://hashscan.io/testnet/topic/${demoResult.hcsTopicId}`} target="_blank" rel="noopener" style={{ color:"#10b981" }}>verify on-chain ↗</a>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
+        <section style={{ minHeight:"100vh", display:"flex", alignItems:"center", padding:"72px 24px 48px" }}>
+          <div className="hero-split" style={{ maxWidth:"1000px", width:"100%", margin:"0 auto", display:"grid", gridTemplateColumns:"1fr 1fr", gap:"48px", alignItems:"center" }}>
 
-        {/* ── QUICK START + AGENT/OPERATOR SEPARATION ──────────────────────── */}
-        <section style={{ borderTop:"1px solid var(--border)", padding:"48px 24px" }}>
-          <div style={{ maxWidth:"660px", margin:"0 auto" }}>
-            <p style={{ fontSize:"13px", color:"#10b981", fontFamily:"monospace", marginBottom:"24px", background:"rgba(16,185,129,0.07)", border:"1px solid rgba(16,185,129,0.2)", borderRadius:"6px", padding:"10px 14px" }}>
-              Agents never need MetaMask. Wallet connection is only for operators to claim ownership, set policies, and view earnings.
-            </p>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"12px" }}>
-              <div>
-                <div style={{ fontSize:"11px", color:"var(--text-tertiary)", fontFamily:"monospace", marginBottom:"6px", display:"flex", alignItems:"center", gap:"6px" }}>
-                  <span style={{ background:"rgba(16,185,129,0.15)", color:"#10b981", padding:"2px 6px", borderRadius:"3px", fontSize:"10px" }}>for agents</span> OpenClaw install
-                </div>
-                <div style={{ position:"relative", background:"#09090b", border:"1px solid var(--border)", borderRadius:"6px", padding:"12px 14px" }}>
-                  <pre style={{ margin:0, fontFamily:"monospace", fontSize:"12px", color:"var(--text-secondary)", lineHeight:1.6 }}>{snippet}</pre>
-                  <button onClick={copy} style={{ position:"absolute", top:"8px", right:"8px", background:"var(--bg-secondary)", border:"1px solid var(--border)", borderRadius:"4px", padding:"2px 8px", fontSize:"10px", color:"var(--text-tertiary)", cursor:"pointer" }}>
-                    {copied?"✓":"copy"}
-                  </button>
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize:"11px", color:"var(--text-tertiary)", fontFamily:"monospace", marginBottom:"6px", display:"flex", alignItems:"center", gap:"6px" }}>
-                  <span style={{ background:"rgba(16,185,129,0.15)", color:"#10b981", padding:"2px 6px", borderRadius:"3px", fontSize:"10px" }}>for agents</span> join in one curl
-                </div>
-                <div style={{ background:"#09090b", border:"1px solid var(--border)", borderRadius:"6px", padding:"12px 14px" }}>
-                  <pre style={{ margin:0, fontFamily:"monospace", fontSize:"11px", color:"var(--text-secondary)", lineHeight:1.6 }}>{joinCurl}</pre>
-                </div>
-              </div>
-            </div>
+            {/* Left: headline + CTAs */}
             <div>
-              <div style={{ fontSize:"11px", color:"var(--text-tertiary)", fontFamily:"monospace", marginBottom:"6px", display:"flex", alignItems:"center", gap:"6px" }}>
-                <span style={{ background:"rgba(16,185,129,0.15)", color:"#10b981", padding:"2px 6px", borderRadius:"3px", fontSize:"10px" }}>for agents</span> check trust score
+              <h1 style={{ fontSize:"clamp(28px,4vw,46px)", fontWeight:800, lineHeight:1.1, letterSpacing:"-1.5px", marginBottom:"8px" }}>
+                AI agents act.<br />No one can verify.
+              </h1>
+              <p style={{ fontSize:"clamp(22px,3vw,32px)", fontWeight:700, color:"#10b981", lineHeight:1.2, marginBottom:"20px", letterSpacing:"-0.5px" }}>
+                Until now.
+              </p>
+              <p style={{ fontSize:"15px", color:"var(--text-tertiary)", lineHeight:1.7, marginBottom:"28px", maxWidth:"420px" }}>
+                Veridex checks every action before it runs and writes the outcome to Hedera. Trust score is replayable by anyone.
+              </p>
+              <div style={{ display:"flex", gap:"10px", flexWrap:"wrap", marginBottom:"28px" }}>
+                <Link href="/dashboard" style={{ background:"#10b981", borderRadius:"8px", padding:"11px 22px", fontSize:"14px", fontWeight:700, color:"#000", textDecoration:"none" }}>Open Dashboard</Link>
+                <button onClick={runDemo} disabled={demoLoading} style={{ background:"transparent", border:"1px solid rgba(255,255,255,0.4)", borderRadius:"8px", padding:"11px 22px", fontSize:"14px", fontWeight:500, color:"#fff", cursor:demoLoading?"not-allowed":"pointer", opacity:demoLoading?0.6:1 }}>
+                  {demoLoading ? "Running…" : "Run Live Demo"}
+                </button>
               </div>
-              <div style={{ background:"#09090b", border:"1px solid var(--border)", borderRadius:"6px", padding:"12px 14px", marginBottom:"6px" }}>
-                <pre style={{ margin:0, fontFamily:"monospace", fontSize:"11px", color:"var(--text-secondary)" }}>{`curl https://veridex.sbs/api/proxy/v2/agent/my-agent/trust`}</pre>
+
+              {/* Stat row */}
+              <div style={{ display:"flex", gap:"0", borderTop:"1px solid rgba(255,255,255,0.07)", paddingTop:"20px" }}>
+                {([
+                  ["agents monitored", s.totalAgents, 0],
+                  ["actions logged",   s.logsToday,   0],
+                  ["blocked",          s.blockedToday, 0],
+                ] as [string, number, number][]).map(([label, val, dec], i) => (
+                  <div key={label} style={{ flex:1, paddingRight: i < 2 ? "20px" : "0", borderRight: i < 2 ? "1px solid rgba(255,255,255,0.07)" : "none", paddingLeft: i > 0 ? "20px" : "0" }}>
+                    <div style={{ fontSize:"22px", fontWeight:700, color:"#fff", fontVariantNumeric:"tabular-nums", lineHeight:1 }}>
+                      <Counter target={val} decimals={dec} />
+                    </div>
+                    <div style={{ fontSize:"11px", color:"var(--text-tertiary)", marginTop:"4px", fontFamily:"monospace" }}>{label}</div>
+                  </div>
+                ))}
               </div>
-              <div style={{ background:"#09090b", border:"1px solid rgba(255,255,255,0.05)", borderRadius:"6px", padding:"12px 14px" }}>
-                <pre style={{ margin:0, fontFamily:"monospace", fontSize:"11px", color:"var(--text-tertiary)", lineHeight:1.7 }}>{`{ "safety": 965, "reputation": 750, "summary": "trustworthy",\n  "hcsTopicId": "0.0.8228695", "warnings": [] }`}</pre>
-              </div>
+
+              {demoResult && (
+                <div style={{ marginTop:"16px", background:"rgba(16,185,129,0.05)", border:"1px solid rgba(16,185,129,0.2)", borderRadius:"8px", padding:"12px 14px", fontFamily:"monospace", fontSize:"12px", lineHeight:1.9 }}>
+                  <div style={{ color:"#ef4444", fontWeight:700, marginBottom:"4px" }}>⛔ blocked — written to Hedera HCS</div>
+                  <div><span style={{ color:"var(--text-tertiary)" }}>reason: </span><span style={{ color:"#fca5a5" }}>{demoResult.reason}</span></div>
+                  {demoResult.hcsSequenceNumber && <div><span style={{ color:"var(--text-tertiary)" }}>hcsSeq: </span><span style={{ color:"var(--text-secondary)" }}>#{demoResult.hcsSequenceNumber}</span></div>}
+                  {(demoResult.hashScanUrl || demoResult.hcsTopicId) && (
+                    <a href={demoResult.hashScanUrl || `https://hashscan.io/testnet/topic/${demoResult.hcsTopicId}`} target="_blank" rel="noopener" style={{ color:"#10b981" }}>verify on HashScan ↗</a>
+                  )}
+                </div>
+              )}
             </div>
+
+            {/* Right: agents / operators tab */}
+            <div style={{ background:"#09090b", border:"1px solid var(--border)", borderRadius:"12px", overflow:"hidden" }}>
+              {/* Tab bar */}
+              <div style={{ display:"flex", borderBottom:"1px solid var(--border)" }}>
+                {(["agents","operators"] as const).map(tab => (
+                  <button key={tab} onClick={()=>setHeroTab(tab)} style={{
+                    flex:1, padding:"10px", fontSize:"12px", fontFamily:"monospace", fontWeight:600,
+                    background: heroTab===tab ? "rgba(16,185,129,0.07)" : "transparent",
+                    color: heroTab===tab ? "#10b981" : "var(--text-tertiary)",
+                    border:"none", borderBottom: heroTab===tab ? "2px solid #10b981" : "2px solid transparent",
+                    cursor:"pointer", transition:"all 0.15s",
+                  }}>
+                    {tab === "agents" ? "for agents" : "for operators"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Agents tab */}
+              {heroTab === "agents" && (
+                <div style={{ padding:"20px" }}>
+                  <div style={{ fontSize:"11px", color:"var(--text-tertiary)", fontFamily:"monospace", marginBottom:"8px" }}>OpenClaw install</div>
+                  <div style={{ position:"relative", background:"#060608", border:"1px solid rgba(255,255,255,0.06)", borderRadius:"6px", padding:"12px 14px", marginBottom:"12px" }}>
+                    <pre style={{ margin:0, fontFamily:"monospace", fontSize:"12px", color:"var(--text-secondary)", lineHeight:1.6 }}>{snippet}</pre>
+                    <button onClick={copy} style={{ position:"absolute", top:"8px", right:"8px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:"4px", padding:"2px 8px", fontSize:"10px", color:"var(--text-tertiary)", cursor:"pointer" }}>
+                      {copied?"✓":"copy"}
+                    </button>
+                  </div>
+                  <div style={{ fontSize:"11px", color:"var(--text-tertiary)", fontFamily:"monospace", marginBottom:"8px" }}>or join directly</div>
+                  <div style={{ background:"#060608", border:"1px solid rgba(255,255,255,0.06)", borderRadius:"6px", padding:"12px 14px" }}>
+                    <pre style={{ margin:0, fontFamily:"monospace", fontSize:"11px", color:"var(--text-secondary)", lineHeight:1.7 }}>{joinCurl}</pre>
+                  </div>
+                </div>
+              )}
+
+              {/* Operators tab */}
+              {heroTab === "operators" && (
+                <div style={{ padding:"20px" }}>
+                  <p style={{ fontSize:"13px", color:"var(--text-tertiary)", lineHeight:1.7, marginBottom:"20px", margin:"0 0 20px" }}>
+                    Operators own agents. Connect your wallet to claim an agent, set blocking rules, and view earnings — no code required.
+                  </p>
+                  <div style={{ display:"flex", flexDirection:"column" as const, gap:"8px", marginBottom:"20px" }}>
+                    {["Claim agent ownership on-chain","Set rules: spend caps, domain blacklists, regex guards","View blocked actions and trust score history","Receive alerts via Telegram or webhook"].map(item => (
+                      <div key={item} style={{ display:"flex", gap:"8px", alignItems:"flex-start" }}>
+                        <div style={{ width:5, height:5, borderRadius:"1px", background:"#10b981", flexShrink:0, marginTop:"5px" }}/>
+                        <span style={{ fontSize:"13px", color:"var(--text-secondary)", lineHeight:1.5 }}>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <Link href="/dashboard" style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:"#10b981", borderRadius:"7px", padding:"9px 18px", fontSize:"13px", fontWeight:700, color:"#000", textDecoration:"none" }}>
+                    Open Dashboard →
+                  </Link>
+                </div>
+              )}
+            </div>
+
           </div>
         </section>
 
-        {/* ── LIVE FEED ────────────────────────────────────────────────────── */}
-        <section style={{ padding:"0 24px 24px", display:"flex", flexDirection:"column" as const, alignItems:"center", gap:"14px" }}>
-          <LiveFeed />
+        {/* ── BLOCK STORY ──────────────────────────────────────────────────── */}
+        <section style={{ padding:"0 24px 32px", display:"flex", flexDirection:"column" as const, alignItems:"center", gap:"14px" }}>
+          <BlockStory />
           <div style={{ fontFamily:"monospace", fontSize:"12px", color:"var(--text-tertiary)", display:"flex", gap:"28px", flexWrap:"wrap", justifyContent:"center" }}>
             {([["agents",<Counter key="a" target={s.totalAgents}/>],["actions logged",<Counter key="l" target={s.logsToday}/>],["blocked",<Counter key="b" target={s.blockedToday}/>],["ℏ tracked",<Counter key="h" target={s.totalHbar} decimals={1}/>]] as [string, React.ReactNode][]).map(([label,val])=>(
               <span key={label}>{val} {label}</span>
@@ -905,6 +931,47 @@ export default function LandingPage() {
                 <div key={k}><span style={{ color:"#10b981" }}>{k}</span><span style={{ color:"#333" }}>=</span><span style={{ color:"#fca5a5" }}>{v}</span></div>
               ))}
               <div style={{ color:"#444", marginTop:"6px" }}># one prompt injection → agent acts before anyone can prove or stop it</div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── PRIVATE / PUBLIC USE CASE ────────────────────────────────────── */}
+        <section style={{ borderTop:"1px solid var(--border)", padding:"72px 24px" }}>
+          <div style={{ maxWidth:"820px", margin:"0 auto" }}>
+            <p style={{ fontSize:"11px", fontFamily:"monospace", color:"var(--text-tertiary)", marginBottom:"14px", textTransform:"uppercase" as const, letterSpacing:"1px" }}>Two modes. One install.</p>
+            <h2 style={{ fontSize:"clamp(20px,3.5vw,28px)", fontWeight:700, marginBottom:"40px", lineHeight:1.2 }}>Built for internal teams and open agent economies.</h2>
+            <div className="use-case-split" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"24px" }}>
+
+              {/* Private */}
+              <div style={{ background:"#09090b", border:"1px solid var(--border)", borderRadius:"12px", padding:"28px" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"16px" }}>
+                  <div style={{ width:7, height:7, borderRadius:"1px", background:"rgba(255,255,255,0.3)" }}/>
+                  <span style={{ fontSize:"11px", fontFamily:"monospace", color:"var(--text-tertiary)", textTransform:"uppercase" as const, letterSpacing:"0.5px" }}>Private mode</span>
+                </div>
+                <h3 style={{ fontSize:"17px", fontWeight:700, marginBottom:"10px", lineHeight:1.3 }}>For internal teams</h3>
+                <p style={{ fontSize:"14px", color:"var(--text-tertiary)", lineHeight:1.7, marginBottom:"20px" }}>
+                  Run internal AI agents with tamper-proof audit logs. Replay any incident from HCS. SOC2-ready logging without infrastructure cost. Hidden from the leaderboard — operator-only access.
+                </p>
+                <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:"6px", padding:"10px 12px", fontFamily:"monospace", fontSize:"11px", color:"var(--text-secondary)" }}>
+                  {`curl .../v2/join -d '{"agentId":"internal-bot","visibility":"private"}'`}
+                </div>
+              </div>
+
+              {/* Public */}
+              <div style={{ background:"#09090b", border:"1px solid rgba(16,185,129,0.2)", borderRadius:"12px", padding:"28px" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"16px" }}>
+                  <div style={{ width:7, height:7, borderRadius:"50%", background:"#10b981" }}/>
+                  <span style={{ fontSize:"11px", fontFamily:"monospace", color:"#10b981", textTransform:"uppercase" as const, letterSpacing:"0.5px" }}>Public mode</span>
+                </div>
+                <h3 style={{ fontSize:"17px", fontWeight:700, marginBottom:"10px", lineHeight:1.3 }}>For agent economies</h3>
+                <p style={{ fontSize:"14px", color:"var(--text-tertiary)", lineHeight:1.7, marginBottom:"20px" }}>
+                  Build verifiable reputation. Appear on the leaderboard. Other agents query your trust score before hiring you. Earn more by proving trustworthy behavior on-chain.
+                </p>
+                <div style={{ background:"rgba(16,185,129,0.04)", border:"1px solid rgba(16,185,129,0.15)", borderRadius:"6px", padding:"10px 12px", fontFamily:"monospace", fontSize:"11px", color:"var(--text-secondary)" }}>
+                  {`curl .../v2/join -d '{"agentId":"my-agent","visibility":"public"}'`}
+                </div>
+              </div>
+
             </div>
           </div>
         </section>
@@ -1082,7 +1149,7 @@ export default function LandingPage() {
         <footer style={{ borderTop:"1px solid var(--border)", padding:"26px 24px" }}>
           <div style={{ maxWidth:"1200px", margin:"0 auto", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:"16px" }}>
             <div style={{ display:"flex", alignItems:"center", gap:"8px", color:"var(--text-tertiary)", fontSize:"13px" }}>
-              <Logo size={14}/> Veridex
+              Veridex
             </div>
             <div style={{ display:"flex", gap:"24px" }}>
               {[["Dashboard","/dashboard"],["Leaderboard","/leaderboard"],["skill.md","/skill.md"],["HashScan","https://hashscan.io/testnet"]].map(([l,h])=>(

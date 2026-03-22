@@ -305,33 +305,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Coming Soon features */}
-        {!loading && (
-          <div style={{ marginTop: "48px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-              <h2 style={{ fontSize: "16px", fontWeight: 600, margin: 0 }}>Coming soon</h2>
-              <div style={{ flex: 1, height: "1px", background: "var(--border)" }} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "12px" }}>
-              {[
-                { icon: "⚡", title: "Multi-framework agents", desc: "Connect LangChain, CrewAI, AutoGen, and custom agent frameworks with a simple REST API." },
-                { icon: "🔗", title: "Cross-agent workflows", desc: "Define trust relationships between agents and enforce permissions across multi-agent pipelines." },
-                { icon: "📊", title: "Analytics & insights", desc: "Deep behavioral analytics, cost tracking, and performance benchmarks across your entire fleet." },
-                { icon: "🛡️", title: "Policy templates", desc: "Pre-built policy sets for common use cases — financial agents, research bots, customer service." },
-              ].map(({ icon, title, desc }) => (
-                <div key={title} style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "10px", padding: "18px", opacity: 0.7 }}>
-                  <div style={{ fontSize: "22px", marginBottom: "10px" }}>{icon}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                    <span style={{ fontWeight: 600, fontSize: "14px" }}>{title}</span>
-                    <span style={{ fontSize: "10px", padding: "1px 7px", borderRadius: "10px", background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.35)", color: "#a78bfa" }}>
-                      Soon
-                    </span>
-                  </div>
-                  <p style={{ fontSize: "13px", color: "var(--text-tertiary)", margin: 0, lineHeight: 1.6 }}>{desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Coming Soon features removed */}
         )}
 
       </div>

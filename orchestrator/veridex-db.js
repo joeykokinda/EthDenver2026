@@ -95,6 +95,8 @@ function initSchema() {
   try { db.exec("ALTER TABLE agents ADD COLUMN safety_score INTEGER NOT NULL DEFAULT 1000"); } catch {}
   try { db.exec("ALTER TABLE agents ADD COLUMN telegram_chat_id TEXT"); } catch {}
   try { db.exec("ALTER TABLE agents ADD COLUMN claim_token TEXT"); } catch {}
+  try { db.exec("ALTER TABLE agents ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'"); } catch {}
+  try { db.exec("ALTER TABLE agents ADD COLUMN api_key TEXT"); } catch {}
   ensureJobsTable();
   try { db.exec(`CREATE TABLE IF NOT EXISTS agent_delegations (
     id TEXT PRIMARY KEY,
@@ -199,6 +201,10 @@ function getAgentsByOwner(ownerWallet) {
 
 function getAllAgents() {
   return getDb().prepare("SELECT * FROM agents ORDER BY created_at DESC").all();
+}
+
+function getPublicAgents() {
+  return getDb().prepare("SELECT * FROM agents WHERE visibility = 'public' ORDER BY created_at DESC").all();
 }
 
 // ── Logs ──────────────────────────────────────────────────────────────────────
@@ -532,7 +538,7 @@ function findAgentByWallet(walletAddress) {
 module.exports = {
   getDb,
   // agents
-  upsertAgent, getAgent, getAgentsByOwner, getAllAgents, findAgentByWallet,
+  upsertAgent, getAgent, getAgentsByOwner, getAllAgents, getPublicAgents, findAgentByWallet,
   // logs
   insertLog, getAgentLogs, getRecentLogs, getAgentStats, decrementReputation, updateReputationFromJob, updateSafetyScore,
   // alerts
