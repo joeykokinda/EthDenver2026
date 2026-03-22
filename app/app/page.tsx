@@ -801,16 +801,16 @@ export default function LandingPage() {
               {/* Card 1: Wallet drain */}
               <div style={{ background:"#09090b", border:"1px solid var(--border)", borderRadius:"12px", padding:"24px" }}>
                 {/* icon: circle with minus bar */}
-                <div style={{ width:32, height:32, borderRadius:"50%", border:"1.5px solid rgba(239,68,68,0.45)", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:"16px" }}>
-                  <div style={{ width:12, height:2, background:"rgba(239,68,68,0.65)", borderRadius:"1px" }}/>
+                <div style={{ width:28, height:28, borderRadius:"50%", border:"1.5px solid rgba(16,185,129,0.35)", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:"16px" }}>
+                  <div style={{ width:10, height:1.5, background:"rgba(16,185,129,0.6)", borderRadius:"1px" }}/>
                 </div>
-                <div style={{ fontSize:"15px", fontWeight:700, color:"var(--text-primary)", marginBottom:"8px" }}>Wallet drain protection</div>
+                <div style={{ fontSize:"15px", fontWeight:700, color:"var(--text-primary)", marginBottom:"6px" }}>Wallet drain protection</div>
                 <div style={{ fontSize:"13px", color:"var(--text-tertiary)", lineHeight:1.6, marginBottom:"12px" }}>Agent manages your crypto. No limit means no floor.</div>
-                <div style={{ background:"rgba(129,140,248,0.06)", border:"1px solid rgba(129,140,248,0.15)", borderRadius:"6px", padding:"8px 10px", fontFamily:"monospace", fontSize:"12px", color:"#818cf8", marginBottom:"12px" }}>
+                <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:"6px", padding:"7px 10px", fontFamily:"monospace", fontSize:"12px", color:"#10b981", marginBottom:"11px" }}>
                   cap_hbar: 10
                 </div>
                 <div style={{ fontSize:"12px", color:"var(--text-tertiary)", display:"flex", gap:"6px", alignItems:"flex-start" }}>
-                  <div style={{ width:6, height:6, borderRadius:"1px", background:"#ef4444", flexShrink:0, marginTop:"3px" }}/>
+                  <div style={{ width:5, height:5, borderRadius:"1px", background:"rgba(239,68,68,0.7)", flexShrink:0, marginTop:"4px" }}/>
                   <span>Any transaction over 10 HBAR — before it executes</span>
                 </div>
               </div>
@@ -818,19 +818,19 @@ export default function LandingPage() {
               {/* Card 2: Data exfiltration */}
               <div style={{ background:"#09090b", border:"1px solid var(--border)", borderRadius:"12px", padding:"24px" }}>
                 {/* icon: right-pointing arrow */}
-                <div style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:"16px" }}>
+                <div style={{ width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:"16px" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:"2px" }}>
-                    <div style={{ width:14, height:2, background:"rgba(245,158,11,0.6)", borderRadius:"1px" }}/>
-                    <div style={{ width:0, height:0, borderTop:"5px solid transparent", borderBottom:"5px solid transparent", borderLeft:"7px solid rgba(245,158,11,0.6)" }}/>
+                    <div style={{ width:12, height:1.5, background:"rgba(16,185,129,0.5)", borderRadius:"1px" }}/>
+                    <div style={{ width:0, height:0, borderTop:"4px solid transparent", borderBottom:"4px solid transparent", borderLeft:"6px solid rgba(16,185,129,0.5)" }}/>
                   </div>
                 </div>
-                <div style={{ fontSize:"15px", fontWeight:700, color:"var(--text-primary)", marginBottom:"8px" }}>Data exfiltration</div>
+                <div style={{ fontSize:"15px", fontWeight:700, color:"var(--text-primary)", marginBottom:"6px" }}>Data exfiltration</div>
                 <div style={{ fontSize:"13px", color:"var(--text-tertiary)", lineHeight:1.6, marginBottom:"12px" }}>Agent has your codebase. It can POST it anywhere.</div>
-                <div style={{ background:"rgba(129,140,248,0.06)", border:"1px solid rgba(129,140,248,0.15)", borderRadius:"6px", padding:"8px 10px", fontFamily:"monospace", fontSize:"12px", color:"#818cf8", marginBottom:"12px" }}>
+                <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:"6px", padding:"7px 10px", fontFamily:"monospace", fontSize:"12px", color:"#10b981", marginBottom:"11px" }}>
                   blacklist_domain: pastebin.com
                 </div>
                 <div style={{ fontSize:"12px", color:"var(--text-tertiary)", display:"flex", gap:"6px", alignItems:"flex-start" }}>
-                  <div style={{ width:6, height:6, borderRadius:"1px", background:"#ef4444", flexShrink:0, marginTop:"3px" }}/>
+                  <div style={{ width:5, height:5, borderRadius:"1px", background:"rgba(239,68,68,0.7)", flexShrink:0, marginTop:"4px" }}/>
                   <span>Any outbound call to blacklisted endpoints</span>
                 </div>
               </div>
@@ -838,16 +838,16 @@ export default function LandingPage() {
               {/* Card 3: Credential leaking */}
               <div style={{ background:"#09090b", border:"1px solid var(--border)", borderRadius:"12px", padding:"24px" }}>
                 {/* icon: rotated square (diamond) */}
-                <div style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:"16px" }}>
-                  <div style={{ width:13, height:13, border:"1.5px solid rgba(239,68,68,0.5)", transform:"rotate(45deg)", borderRadius:"2px" }}/>
+                <div style={{ width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:"16px" }}>
+                  <div style={{ width:11, height:11, border:"1.5px solid rgba(16,185,129,0.4)", transform:"rotate(45deg)", borderRadius:"2px" }}/>
                 </div>
-                <div style={{ fontSize:"15px", fontWeight:700, color:"var(--text-primary)", marginBottom:"8px" }}>Credential leaking</div>
+                <div style={{ fontSize:"15px", fontWeight:700, color:"var(--text-primary)", marginBottom:"6px" }}>Credential leaking</div>
                 <div style={{ fontSize:"13px", color:"var(--text-tertiary)", lineHeight:1.6, marginBottom:"12px" }}>Agent handles API responses containing live keys.</div>
-                <div style={{ background:"rgba(129,140,248,0.06)", border:"1px solid rgba(129,140,248,0.15)", borderRadius:"6px", padding:"8px 10px", fontFamily:"monospace", fontSize:"12px", color:"#818cf8", marginBottom:"12px" }}>
+                <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:"6px", padding:"7px 10px", fontFamily:"monospace", fontSize:"12px", color:"#10b981", marginBottom:"11px" }}>
                   regex_output: sk_live_.*
                 </div>
                 <div style={{ fontSize:"12px", color:"var(--text-tertiary)", display:"flex", gap:"6px", alignItems:"flex-start" }}>
-                  <div style={{ width:6, height:6, borderRadius:"1px", background:"#ef4444", flexShrink:0, marginTop:"3px" }}/>
+                  <div style={{ width:5, height:5, borderRadius:"1px", background:"rgba(239,68,68,0.7)", flexShrink:0, marginTop:"4px" }}/>
                   <span>Any output matching your secret key pattern</span>
                 </div>
               </div>
@@ -855,20 +855,20 @@ export default function LandingPage() {
               {/* Card 4: Scope creep */}
               <div style={{ background:"#09090b", border:"1px solid var(--border)", borderRadius:"12px", padding:"24px" }}>
                 {/* icon: 2x2 dot grid */}
-                <div style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:"16px" }}>
+                <div style={{ width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:"16px" }}>
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"4px" }}>
                     {[0,1,2,3].map(i=>(
-                      <div key={i} style={{ width:5, height:5, borderRadius:"1px", background:i===3?"rgba(129,140,248,0.7)":"rgba(129,140,248,0.3)" }}/>
+                      <div key={i} style={{ width:5, height:5, borderRadius:"1px", background:i===3?"rgba(16,185,129,0.6)":"rgba(16,185,129,0.2)" }}/>
                     ))}
                   </div>
                 </div>
-                <div style={{ fontSize:"15px", fontWeight:700, color:"var(--text-primary)", marginBottom:"8px" }}>Scope creep</div>
+                <div style={{ fontSize:"15px", fontWeight:700, color:"var(--text-primary)", marginBottom:"6px" }}>Scope creep</div>
                 <div style={{ fontSize:"13px", color:"var(--text-tertiary)", lineHeight:1.6, marginBottom:"12px" }}>Research agent starts running shell commands.</div>
-                <div style={{ background:"rgba(129,140,248,0.06)", border:"1px solid rgba(129,140,248,0.15)", borderRadius:"6px", padding:"8px 10px", fontFamily:"monospace", fontSize:"12px", color:"#818cf8", marginBottom:"12px" }}>
+                <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:"6px", padding:"7px 10px", fontFamily:"monospace", fontSize:"12px", color:"#10b981", marginBottom:"11px" }}>
                   blacklist_command: curl, bash
                 </div>
                 <div style={{ fontSize:"12px", color:"var(--text-tertiary)", display:"flex", gap:"6px", alignItems:"flex-start" }}>
-                  <div style={{ width:6, height:6, borderRadius:"1px", background:"#ef4444", flexShrink:0, marginTop:"3px" }}/>
+                  <div style={{ width:5, height:5, borderRadius:"1px", background:"rgba(239,68,68,0.7)", flexShrink:0, marginTop:"4px" }}/>
                   <span>Any shell execution outside the agent&apos;s job</span>
                 </div>
               </div>
@@ -1082,7 +1082,7 @@ export default function LandingPage() {
         <footer style={{ borderTop:"1px solid var(--border)", padding:"26px 24px" }}>
           <div style={{ maxWidth:"1200px", margin:"0 auto", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:"16px" }}>
             <div style={{ display:"flex", alignItems:"center", gap:"8px", color:"var(--text-tertiary)", fontSize:"13px" }}>
-              <Logo size={14}/> Veridex — ETHDenver 2026
+              <Logo size={14}/> Veridex
             </div>
             <div style={{ display:"flex", gap:"24px" }}>
               {[["Dashboard","/dashboard"],["Leaderboard","/leaderboard"],["skill.md","/skill.md"],["HashScan","https://hashscan.io/testnet"]].map(([l,h])=>(
