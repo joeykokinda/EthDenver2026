@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useWallet } from "../lib/wallet";
+import { Logo } from "./Logo";
 
 export function Nav() {
   const { address, shortAddress, connect, disconnect, isConnecting } = useWallet();
@@ -28,9 +29,12 @@ export function Nav() {
         height: "52px",
         boxShadow: "0 4px 32px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.04) inset",
       }}>
-        {/* Wordmark */}
-        <Link href="/" style={{ textDecoration: "none", color: "#fff", fontWeight: 500, fontSize: "15px", letterSpacing: "-0.3px", flexShrink: 0 }}>
-          Veridex
+        {/* Logo + Wordmark */}
+        <Link href="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+          <Logo size={20} />
+          <span style={{ color: "#fff", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: "16px", letterSpacing: "-0.4px" }}>
+            Veridex
+          </span>
         </Link>
 
         {/* Nav links */}

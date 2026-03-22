@@ -606,7 +606,7 @@ function CantVerifyCol() {
 interface DemoResult { agentId: string; hcsTopicId: string|null; hashScanUrl: string|null; hcsSequenceNumber: number|null; reason: string; }
 
 export default function LandingPage() {
-  const { connect, isConnecting } = useWallet();
+  useWallet();
   const [stats, setStats]         = useState<OverviewStats|null>(null);
   const [copied, setCopied]       = useState(false);
   const [demoResult, setDemoResult] = useState<DemoResult|null>(null);
@@ -793,24 +793,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ── HOW IT WORKS ─────────────────────────────────────────────────── */}
-        <section style={{ borderTop:"1px solid var(--border)", padding:"72px 24px", maxWidth:"820px", margin:"0 auto" }}>
-          <p style={{ fontSize:"11px", fontFamily:"monospace", color:"var(--text-tertiary)", marginBottom:"14px", textTransform:"uppercase" as const, letterSpacing:"1px" }}>How it works</p>
-          <h2 style={{ fontSize:"clamp(20px,3.5vw,28px)", fontWeight:700, marginBottom:"40px", lineHeight:1.2 }}>Every agent action runs through Veridex.</h2>
-          <div className="how-grid" style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"32px" }}>
-            {([
-              { step:"01", color:"#f59e0b", label:"Agent joins with one curl and gets an on-chain identity" },
-              { step:"02", color:"#ef4444", label:"Every action is checked before it runs — dangerous ones blocked" },
-              { step:"03", color:"#10b981", label:"Outcomes are written to Hedera — trust score replayable by anyone" },
-            ] as {step:string;color:string;label:string}[]).map(({step,color,label})=>(
-              <div key={step}>
-                <div style={{ fontFamily:"monospace", fontSize:"11px", color:"var(--text-tertiary)", marginBottom:"10px", letterSpacing:"0.5px" }}>{step}</div>
-                <p style={{ fontSize:"16px", fontWeight:600, color, lineHeight:1.5, margin:0 }}>{label}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
         {/* ── WHY OPERATORS SET RULES ──────────────────────────────────────── */}
         <section style={{ borderTop:"1px solid var(--border)", padding:"72px 24px" }}>
           <div style={{ maxWidth:"820px", margin:"0 auto" }}>
@@ -907,6 +889,73 @@ export default function LandingPage() {
             <Link href="/dashboard" style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"transparent", border:"1px solid #10b981", borderRadius:"8px", padding:"11px 22px", fontSize:"14px", fontWeight:600, color:"#10b981", textDecoration:"none" }}>
               Set your first rule →
             </Link>
+          </div>
+        </section>
+
+        {/* ── HOW IT WORKS ─────────────────────────────────────────────────── */}
+        <section style={{ borderTop:"1px solid var(--border)", padding:"80px 24px", background:"rgba(0,0,0,0.3)" }}>
+          <div style={{ maxWidth:"960px", margin:"0 auto" }}>
+            <p style={{ fontSize:"11px", fontFamily:"monospace", color:"var(--text-tertiary)", marginBottom:"14px", textTransform:"uppercase" as const, letterSpacing:"1px", textAlign:"center" }}>How it works</p>
+            <h2 style={{ fontSize:"clamp(20px,3.5vw,30px)", fontWeight:700, marginBottom:"56px", lineHeight:1.2, textAlign:"center" }}>Every agent action runs through Veridex.</h2>
+
+            <div className="how-steps" style={{ display:"grid", gridTemplateColumns:"1fr 40px 1fr 40px 1fr", alignItems:"start", gap:"0" }}>
+
+              {/* Step 01 */}
+              <div style={{ background:"#09090b", border:"1px solid var(--border)", borderTop:"2px solid #f59e0b", borderRadius:"12px", padding:"24px" }}>
+                <div style={{ fontSize:"32px", fontFamily:"'Space Grotesk', monospace", fontWeight:700, color:"rgba(245,158,11,0.18)", lineHeight:1, marginBottom:"14px", letterSpacing:"-1px" }}>01</div>
+                <div style={{ background:"#060608", border:"1px solid rgba(255,255,255,0.05)", borderRadius:"6px", padding:"11px 13px", fontFamily:"monospace", fontSize:"11px", marginBottom:"18px", lineHeight:1.85 }}>
+                  <div style={{ color:"#555" }}>$ curl .../v2/join</div>
+                  <div><span style={{ color:"#f59e0b" }}>agentId</span><span style={{ color:"#444" }}>: </span><span style={{ color:"#a3a3a3" }}>"my-agent"</span></div>
+                  <div><span style={{ color:"#f59e0b" }}>hcsTopicId</span><span style={{ color:"#444" }}>: </span><span style={{ color:"#10b981" }}>"0.0.8336632"</span></div>
+                  <div><span style={{ color:"#f59e0b" }}>status</span><span style={{ color:"#444" }}>: </span><span style={{ color:"#10b981" }}>"registered"</span></div>
+                </div>
+                <div style={{ fontSize:"15px", fontWeight:700, marginBottom:"8px", color:"var(--text-primary)" }}>Agent joins in one call</div>
+                <p style={{ fontSize:"13px", color:"var(--text-tertiary)", lineHeight:1.65, margin:0 }}>One POST. On-chain identity created. HCS topic assigned. Appears on the leaderboard in under 5 seconds.</p>
+              </div>
+
+              {/* Arrow */}
+              <div className="how-arrow" style={{ display:"flex", alignItems:"center", justifyContent:"center", paddingTop:"72px" }}>
+                <div style={{ display:"flex", alignItems:"center" }}>
+                  <div style={{ width:"16px", height:"1px", background:"rgba(255,255,255,0.1)" }}/>
+                  <div style={{ width:0, height:0, borderTop:"4px solid transparent", borderBottom:"4px solid transparent", borderLeft:"5px solid rgba(255,255,255,0.12)" }}/>
+                </div>
+              </div>
+
+              {/* Step 02 */}
+              <div style={{ background:"#09090b", border:"1px solid var(--border)", borderTop:"2px solid #ef4444", borderRadius:"12px", padding:"24px" }}>
+                <div style={{ fontSize:"32px", fontFamily:"'Space Grotesk', monospace", fontWeight:700, color:"rgba(239,68,68,0.18)", lineHeight:1, marginBottom:"14px", letterSpacing:"-1px" }}>02</div>
+                <div style={{ background:"#060608", border:"1px solid rgba(255,255,255,0.05)", borderRadius:"6px", padding:"11px 13px", fontFamily:"monospace", fontSize:"11px", marginBottom:"18px", lineHeight:1.85 }}>
+                  <div style={{ color:"#818cf8" }}>shell_exec(cat /etc/passwd)</div>
+                  <div style={{ color:"#555", fontSize:"10px" }}>↓ evaluating…</div>
+                  <div style={{ color:"#ef4444", fontWeight:700 }}>✗ blocked · credential access</div>
+                  <div style={{ color:"#555", fontSize:"10px" }}>allowed: false — returned to agent</div>
+                </div>
+                <div style={{ fontSize:"15px", fontWeight:700, marginBottom:"8px", color:"var(--text-primary)" }}>Every action checked before it runs</div>
+                <p style={{ fontSize:"13px", color:"var(--text-tertiary)", lineHeight:1.65, margin:0 }}>Synchronous gate. The agent receives <code style={{ fontFamily:"monospace", fontSize:"11px" }}>allowed: false</code> before it can execute. The block happens before the agent knows it was blocked.</p>
+              </div>
+
+              {/* Arrow */}
+              <div className="how-arrow" style={{ display:"flex", alignItems:"center", justifyContent:"center", paddingTop:"72px" }}>
+                <div style={{ display:"flex", alignItems:"center" }}>
+                  <div style={{ width:"16px", height:"1px", background:"rgba(255,255,255,0.1)" }}/>
+                  <div style={{ width:0, height:0, borderTop:"4px solid transparent", borderBottom:"4px solid transparent", borderLeft:"5px solid rgba(255,255,255,0.12)" }}/>
+                </div>
+              </div>
+
+              {/* Step 03 */}
+              <div style={{ background:"#09090b", border:"1px solid var(--border)", borderTop:"2px solid #10b981", borderRadius:"12px", padding:"24px" }}>
+                <div style={{ fontSize:"32px", fontFamily:"'Space Grotesk', monospace", fontWeight:700, color:"rgba(16,185,129,0.15)", lineHeight:1, marginBottom:"14px", letterSpacing:"-1px" }}>03</div>
+                <div style={{ background:"#060608", border:"1px solid rgba(255,255,255,0.05)", borderRadius:"6px", padding:"11px 13px", fontFamily:"monospace", fontSize:"11px", marginBottom:"18px", lineHeight:1.85 }}>
+                  <div style={{ color:"#10b981" }}>HCS seq #1848 written · 3.1s</div>
+                  <div><span style={{ color:"#555" }}>topic: </span><span style={{ color:"#818cf8" }}>0.0.8228696</span></div>
+                  <div><span style={{ color:"#555" }}>trust: </span><span style={{ color:"#ef4444" }}>245 </span><span style={{ color:"#555", fontSize:"10px" }}>(-50 blocked)</span></div>
+                  <a href="https://hashscan.io/testnet/topic/0.0.8228696" target="_blank" rel="noopener" style={{ color:"#444", fontSize:"10px", textDecoration:"none" }}>hashscan.io/testnet/... ↗</a>
+                </div>
+                <div style={{ fontSize:"15px", fontWeight:700, marginBottom:"8px", color:"var(--text-primary)" }}>Outcome written to Hedera</div>
+                <p style={{ fontSize:"13px", color:"var(--text-tertiary)", lineHeight:1.65, margin:0 }}>Tamper-proof. 3-second finality. Trust score is derived from HCS consensus — replayable by anyone, not just Veridex.</p>
+              </div>
+
+            </div>
           </div>
         </section>
 
@@ -1139,9 +1188,7 @@ export default function LandingPage() {
           <div style={{ display:"flex", gap:"12px", justifyContent:"center", flexWrap:"wrap" }}>
             <Link href="/dashboard" style={{ background:"#10b981", borderRadius:"8px", padding:"12px 26px", fontSize:"15px", fontWeight:700, color:"#000", textDecoration:"none" }}>Launch Dashboard</Link>
             <Link href="/leaderboard" style={{ background:"transparent", border:"1px solid var(--border)", borderRadius:"8px", padding:"12px 26px", fontSize:"15px", fontWeight:500, color:"var(--text-primary)", textDecoration:"none" }}>View Live System</Link>
-            <button onClick={connect} disabled={isConnecting} style={{ background:"transparent", border:"1px solid var(--border)", borderRadius:"8px", padding:"12px 26px", fontSize:"15px", fontWeight:500, color:"var(--text-primary)", cursor:"pointer", opacity:isConnecting?0.7:1 }}>
-              {isConnecting?"Connecting…":"Install Skill"}
-            </button>
+            <a href="/skill.md" target="_blank" rel="noopener" style={{ background:"transparent", border:"1px solid var(--border)", borderRadius:"8px", padding:"12px 26px", fontSize:"15px", fontWeight:500, color:"var(--text-primary)", textDecoration:"none" }}>skill.md →</a>
           </div>
         </section>
 
@@ -1209,6 +1256,8 @@ export default function LandingPage() {
           .problem-grid { grid-template-columns: 1fr !important; }
           .how-grid { grid-template-columns: 1fr !important; gap: 24px !important; }
           .ademo { height: auto; min-height: 140px; }
+          .how-steps { grid-template-columns: 1fr !important; }
+          .how-steps .how-arrow { display: none !important; }
         }
         @media (max-width: 480px) {
           .ademo { min-height: 120px; padding: 10px 12px; }
