@@ -1138,6 +1138,73 @@ app.post("/v2/post-execute", async (req, res) => {
     agentRecord = db.getAgent(agentId);
   }
 
+  // ── Unlogged execution detection ──────────────────────────────────────────
+  // If no logId is provided, or the provided logId doesn't match a real
+  // phase:"before" entry for this agent+action, the action executed without
+  // going through the pre-execution gate — flag it.
+  const sqliteDb = db.getDb();
+  let preCheckExists = false;
+  if (logId) {
+    const preLog = sqliteDb.prepare(
+      "SELECT id FROM logs WHERE id = ? AND agent_id = ? AND phase = 'before'"
+    ).get(logId, agentId);
+    preCheckExists = !!preLog;
+  }
+
+  if (!preCheckExists && action) {
+    // Look for any recent (last 30s) unmatched before-log for this action
+    const recentUnmatched = sqliteDb.prepare(
+      `SELECT id FROM logs
+       WHERE agent_id = ? AND action = ? AND phase = 'before'
+         AND timestamp > ? AND id NOT IN (
+           SELECT COALESCE(CAST(json_extract(params,'$.preCheckLogId') AS TEXT),'') FROM logs
+           WHERE agent_id = ? AND phase = 'after'
+         )
+       ORDER BY timestamp DESC LIMIT 1`
+    ).get(agentId, action, Date.now() - 30000, agentId);
+
+    if (!recentUnmatched) {
+      // No matching pre-check found — action executed without going through the gate
+      console.warn(`[unlogged-exec] Agent ${agentId} executed ${action} with no pre-check`);
+
+      db.insertLog({
+        agentId, action, tool,
+        params: { unlogged: true },
+        description: `⚠️ UNLOGGED EXECUTION: ${action} ran without a pre-execution gate check`,
+        result: "suspicious", riskLevel: "high", phase: "unlogged",
+        timestamp: Date.now(),
+      });
+
+      db.insertAlert({
+        agentId,
+        triggerType: "unlogged_execution",
+        description: `Agent executed ${action} without calling the pre-execution gate — possible prompt injection or bypass attempt`,
+        timestamp: Date.now(),
+      });
+
+      fireWebhooks(agentId, "high_risk", {
+        event: "unlogged_execution",
+        agentId,
+        action,
+        tool,
+        reason: "Action executed without pre-execution gate check",
+        timestamp: Date.now(),
+        hcsTopicId: agentRecord.hcs_topic_id,
+      });
+
+      // Write the bypass attempt to HCS so it's permanently on-chain
+      if (agentRecord.hcs_topic_id) {
+        writeToHCS(agentRecord.hcs_topic_id, {
+          event: "unlogged_execution",
+          agentId, action, tool,
+          warning: "Action executed without pre-execution gate — bypass attempt flagged",
+          timestamp: Date.now(),
+        }, agentRecord.hcs_encryption_key || null).catch(() => {});
+      }
+    }
+  }
+  // ── End unlogged execution detection ──────────────────────────────────────
+
   const params = { result: result || "success", output: typeof output === "string" ? output.slice(0, 200) : undefined };
   const description = decodeAction({ action, tool, params, result: "success" });
   const risk = assessRisk(action, tool, params);

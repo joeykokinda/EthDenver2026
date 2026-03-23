@@ -42,48 +42,6 @@ function Counter({ target, decimals=0 }: { target: number; decimals?: number }) 
   return <span ref={ref}>{val.toFixed(decimals)}</span>;
 }
 
-// ── Block story (operator perspective demo) ────────────────────────────────────
-const STORY_STEPS = [
-  { phase:"attempt",  label:"RogueBot",  action:'shell_exec cat /etc/passwd',        note:"credential harvest attempt",    color:"var(--text-tertiary)" },
-  { phase:"blocked",  label:"Veridex",   action:"BLOCKED — credential access rule",   note:"pre-execution gate fired",       color:"#ef4444" },
-  { phase:"hcs",      label:"Hedera",    action:"HCS seq #1848 written — 3.1s",       note:"tamper-proof, verifiable forever",color:"#10b981" },
-  { phase:"recover",  label:"RogueBot",  action:'web_search "quarterly earnings"',    note:"next job — unaffected",          color:"var(--text-secondary)" },
-];
-function BlockStory() {
-  const [step, setStep] = useState(-1);
-  const [tick, setTick] = useState(0);
-  useEffect(() => { const iv = setInterval(() => setTick(t=>t+1), 5600); return () => clearInterval(iv); }, []);
-  useEffect(() => {
-    setStep(-1);
-    const ts = STORY_STEPS.map((_,i) => setTimeout(() => setStep(i), 600 + i * 1100));
-    return () => ts.forEach(clearTimeout);
-  }, [tick]);
-  return (
-    <div style={{ background:"#09090b", border:"1px solid var(--border)", borderRadius:"10px", overflow:"hidden", width:"100%", maxWidth:"820px" }}>
-      <div style={{ padding:"8px 14px", borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", gap:"10px", background:"#0f0f11" }}>
-        <div style={{ display:"flex", gap:"5px" }}>{["#3f3f46","#3f3f46","#10b981"].map((c,i)=><div key={i} style={{ width:9,height:9,borderRadius:"50%",background:c }}/>)}</div>
-        <span style={{ fontSize:"12px", color:"var(--text-tertiary)", fontFamily:"monospace" }}>operator view — what happens when an agent is blocked</span>
-      </div>
-      <div style={{ padding:"4px 0" }}>
-        {STORY_STEPS.map((s, i) => (
-          <div key={s.phase} style={{
-            padding:"10px 14px",
-            borderBottom: i < STORY_STEPS.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-            display:"flex", gap:"10px", alignItems:"center",
-            background: s.phase==="blocked" ? "rgba(220,38,38,0.06)" : s.phase==="hcs" ? "rgba(16,185,129,0.04)" : "transparent",
-            opacity: step >= i ? 1 : 0.1,
-            transition: "opacity 0.4s ease",
-          }}>
-            <span style={{ fontSize:"10px", fontFamily:"monospace", color:"var(--text-tertiary)", flexShrink:0, minWidth:"58px" }}>{s.label}</span>
-            <div style={{ width:1, height:16, background:"rgba(255,255,255,0.08)", flexShrink:0 }}/>
-            <span style={{ fontSize:"13px", fontFamily:"monospace", color: s.color, flex:1 }}>{s.action}</span>
-            <span style={{ fontSize:"11px", color:"var(--text-tertiary)", fontFamily:"monospace", flexShrink:0 }}>{s.note}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ── Animated demos ────────────────────────────────────────────────────────────
 
@@ -734,15 +692,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ── BLOCK STORY ──────────────────────────────────────────────────── */}
-        <section style={{ padding:"0 24px 32px", display:"flex", flexDirection:"column" as const, alignItems:"center", gap:"14px" }}>
-          <BlockStory />
-          <div style={{ fontFamily:"monospace", fontSize:"12px", color:"var(--text-tertiary)", display:"flex", gap:"28px", flexWrap:"wrap", justifyContent:"center" }}>
-            {([["agents",<Counter key="a" target={s.totalAgents}/>],["actions logged",<Counter key="l" target={s.logsToday}/>],["blocked",<Counter key="b" target={s.blockedToday}/>],["ℏ tracked",<Counter key="h" target={s.totalHbar} decimals={1}/>]] as [string, React.ReactNode][]).map(([label,val])=>(
-              <span key={label}>{val} {label}</span>
-            ))}
-          </div>
-        </section>
 
         {/* ── THE PROBLEM ──────────────────────────────────────────────────── */}
         <section style={{ padding:"80px 24px", maxWidth:"860px", margin:"0 auto" }}>

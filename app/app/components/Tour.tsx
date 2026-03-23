@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 export type TourStep = {
@@ -58,6 +58,50 @@ export function TourBubble({ steps, step, next, skip }: {
 }) {
   const router = useRouter();
   const [pos, setPos] = useState({ top: 0, left: 0, arrowDir: "top" as string });
+  const bubbleRef = useRef<HTMLDivElement>(null);
+
+  const reposition = useCallback(() => {
+    if (step === null) return;
+    const s = steps[step];
+    if (!s) return;
+
+    const el = document.getElementById(s.targetId);
+    const bubbleW = 300;
+    // Measure actual rendered height, fall back to generous estimate
+    const bubbleH = bubbleRef.current?.offsetHeight || 260;
+    const gap = 20;
+
+    if (!el) {
+      setPos({ top: Math.max(80, window.innerHeight - bubbleH - 24), left: window.innerWidth / 2 - bubbleW / 2, arrowDir: "none" });
+      return;
+    }
+
+    const rect = el.getBoundingClientRect();
+    const spaceRight = window.innerWidth - rect.right - gap;
+    const spaceLeft  = rect.left - gap;
+
+    let top = 0, left = 0, arrowDir = "left";
+
+    if (spaceRight >= bubbleW + 8) {
+      left = rect.right + gap;
+      top  = rect.top + rect.height / 2 - bubbleH / 2;
+      arrowDir = "left";
+    } else if (spaceLeft >= bubbleW + 8) {
+      left = rect.left - bubbleW - gap;
+      top  = rect.top + rect.height / 2 - bubbleH / 2;
+      arrowDir = "right";
+    } else {
+      left = window.innerWidth / 2 - bubbleW / 2;
+      top  = rect.bottom + gap;
+      arrowDir = "top";
+    }
+
+    // clamp so it never goes off-screen
+    top  = Math.max(80, Math.min(top, window.innerHeight - bubbleH - 16));
+    left = Math.max(8,  Math.min(left, window.innerWidth - bubbleW - 8));
+
+    setPos({ top, left, arrowDir });
+  }, [step, steps]);
 
   useEffect(() => {
     if (step === null) return;
@@ -65,53 +109,20 @@ export function TourBubble({ steps, step, next, skip }: {
     if (!s) return;
 
     const el = document.getElementById(s.targetId);
-    if (!el) {
-      // fallback to center-bottom
-      setPos({ top: window.innerHeight - 220, left: window.innerWidth / 2 - 160, arrowDir: "none" });
-      return;
+    if (el) {
+      el.classList.add("tour-highlight");
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
-    el.classList.add("tour-highlight");
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Run once immediately (rough), then again after paint so we have real height
+    reposition();
+    const raf = requestAnimationFrame(() => reposition());
 
-    const rect = el.getBoundingClientRect();
-    const bubbleW = 300;
-    const bubbleH = 190;
-    const gap = 20;
-
-    // Always try to place the bubble to the RIGHT of the element first.
-    // If there's not enough room on the right, fall back to the LEFT.
-    // This keeps the bubble out of the content area entirely.
-    const spaceRight = window.innerWidth - rect.right - gap;
-    const spaceLeft  = rect.left - gap;
-
-    let top = 0, left = 0, arrowDir = "left";
-
-    if (spaceRight >= bubbleW + 8) {
-      // Right rail — plenty of room
-      left = rect.right + gap;
-      top  = rect.top + rect.height / 2 - bubbleH / 2;
-      arrowDir = "left";
-    } else if (spaceLeft >= bubbleW + 8) {
-      // Left rail
-      left = rect.left - bubbleW - gap;
-      top  = rect.top + rect.height / 2 - bubbleH / 2;
-      arrowDir = "right";
-    } else {
-      // Narrow viewport — float below the element, centered
-      left = window.innerWidth / 2 - bubbleW / 2;
-      top  = rect.bottom + gap;
-      arrowDir = "top";
-    }
-
-    // clamp vertically so it never goes off-screen
-    top = Math.max(80, Math.min(top, window.innerHeight - bubbleH - 16));
-    left = Math.max(8, Math.min(left, window.innerWidth - bubbleW - 8));
-
-    setPos({ top, left, arrowDir });
-
-    return () => el.classList.remove("tour-highlight");
-  }, [step, steps]);
+    return () => {
+      cancelAnimationFrame(raf);
+      el?.classList.remove("tour-highlight");
+    };
+  }, [step, steps, reposition]);
 
   if (step === null) return null;
   const s = steps[step];
@@ -128,11 +139,13 @@ export function TourBubble({ steps, step, next, skip }: {
       }} />
 
       {/* Bubble */}
-      <div style={{
+      <div ref={bubbleRef} style={{
         position: "fixed",
         top: pos.top,
         left: pos.left,
         width: 300,
+        maxHeight: "calc(100vh - 100px)",
+        overflowY: "auto",
         zIndex: 1000,
         background: "#0f0f11",
         border: "1px solid rgba(16,185,129,0.4)",

@@ -65,6 +65,7 @@ This is agent commerce with provable accountability. Not possible without a shar
 |-------|---------------|
 | **Pre-execution gate** | Every action checked synchronously — returns `allowed: true/false` before the agent can proceed |
 | **HCS attestation** | Action written to Hedera HCS — AES-256-GCM encrypted, append-only, 3s finality, HashScan-verifiable |
+| **Unlogged execution detection** | If an agent calls `/v2/post-execute` without a matching pre-check log, the bypass is flagged, written to HCS, and fires an alert — the absence of a gate entry is itself evidence of tampering |
 | **Operator policies** | Domain blacklists, command blacklists, HBAR spend caps, regex output guards — set from dashboard, no redeploy |
 | **Safety score** | Score starts at 1000, reduced per blocked action — any agent queries before hiring |
 | **Telegram kill-switch** | `/block <agentId>` quarantines an agent in seconds from your phone |
@@ -103,6 +104,30 @@ Agent  →  POST /v2/post-execute  { agentId, logId, result, output }
 ```
 
 The `logId` from phase 1 links the two records. This means the HCS topic contains both "what was attempted" and "what actually happened" — paired, tamper-proof, in sequence.
+
+### Unlogged Execution Detection
+
+A well-behaved agent calls the pre-execution gate before every action. But a prompt-injected or rogue agent might skip the gate and call `/v2/post-execute` directly with the outcome — or call neither, and just act.
+
+Veridex detects this at the post-execute step. When `/v2/post-execute` is called, it checks whether a matching `phase: "before"` log exists for the provided `logId` and `agentId`. If not:
+
+```
+Agent skips /api/log and executes action directly
+    ↓
+Agent calls POST /v2/post-execute { agentId, action, ... } (no logId)
+    ↓
+Veridex: no matching pre-check log found for this agent + action
+    ↓
+⚠️ UNLOGGED EXECUTION flagged:
+  - Suspicious entry written to activity feed (phase: "unlogged")
+  - Alert created in dashboard
+  - Webhook fired to operator
+  - Bypass attempt written to HCS (permanent, tamper-proof)
+```
+
+This means **the absence of a pre-check is itself on-chain evidence**. An operator reviewing the HCS topic will see an `unlogged_execution` entry at the exact sequence number where the bypass occurred. You cannot retroactively insert a pre-check entry — HCS is append-only.
+
+This does not prevent a fully adversarial agent from acting — but it makes every bypass permanently attributable and verifiable on Hedera.
 
 ### The Blocking Gate — Evaluation Order
 
@@ -146,6 +171,7 @@ The first match wins. Evaluation stops.
 | HBAR spend over cap | Operator policy | −10 |
 | Regex output guard | Operator policy | −10 |
 | 20+ identical actions / 60s | Loop detection | −10 |
+| No pre-check log for executed action | Unlogged execution | alert + HCS entry |
 | Quarantine flag | Telegram `/block` | blocks all |
 
 ---
@@ -494,7 +520,9 @@ OpenClaw Agent
     │
     └─ POST /v2/post-execute (phase: "after")
             │
-            ├─ log result linked to logId
+            ├─ check: does a matching phase:"before" log exist for this logId?
+            ├─ NO → flag unlogged_execution → alert + webhook + HCS entry written
+            ├─ YES → log result linked to logId
             └─ HCS entry updated with outcome
 ```
 

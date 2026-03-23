@@ -49,6 +49,14 @@ export function Nav() {
                 {label}
               </Link>
             ))}
+            <a href="https://t.me/joe123459" target="_blank" rel="noopener noreferrer" style={{
+              fontSize: "13px", textDecoration: "none",
+              padding: "6px 14px", borderRadius: "100px",
+              color: "rgba(255,255,255,0.45)", fontWeight: 400,
+              transition: "all 0.15s",
+            }}>
+              Questions?
+            </a>
           </nav>
           <div style={{ flexShrink: 0 }}>
             <Link href="/dashboard" style={{
