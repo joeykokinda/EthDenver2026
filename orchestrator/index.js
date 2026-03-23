@@ -2068,6 +2068,7 @@ process.on("SIGINT", () => {
     { id: "data-bot-demo",      name: "DataBot",      wallet: process.env.DATA_BOT_ADDRESS  || "0xd9197748A698cF4a7B2FE82cB9AA3ed0aB60759d", hcs: "0.0.8268065" },
     { id: "api-bot-demo",       name: "APIBot",       wallet: process.env.API_BOT_ADDRESS   || "0x16f67cDF5F06F832e9B43E067bfb56e3D4250624", hcs: "0.0.8268072" },
     { id: "market-scout-9z",    name: "market-scout-9z", wallet: "0xf1b067B8a3939B10785a08E1971984375556388c", hcs: "0.0.8348666" },
+    { id: "live-demo-001",      name: "live-demo-001",   wallet: "0xf1b067B8a3939B10785a08E1971984375556388c", hcs: "0.0.8349099" },
   ];
   for (const a of DEMO_AGENTS) {
     try {

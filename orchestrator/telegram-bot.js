@@ -364,6 +364,25 @@ async function poll() {
   }
 }
 
+// Acquire a DB-level polling lock so only one Railway pod polls at a time.
+// The lock row is refreshed every 15s. If another pod holds a lock < 20s old, we skip.
+const POLL_LOCK_KEY = "telegram_poll_lock";
+const LOCK_TTL_MS = 20000;
+function acquirePollLock() {
+  try {
+    const d = db.getDb();
+    d.exec(`CREATE TABLE IF NOT EXISTS kv_locks (key TEXT PRIMARY KEY, holder TEXT, acquired_at INTEGER)`);
+    const pid = String(process.pid);
+    const now = Date.now();
+    const existing = d.prepare("SELECT * FROM kv_locks WHERE key = ?").get(POLL_LOCK_KEY);
+    if (existing && existing.holder !== pid && (now - existing.acquired_at) < LOCK_TTL_MS) {
+      return false; // another pod holds the lock
+    }
+    d.prepare("INSERT OR REPLACE INTO kv_locks (key, holder, acquired_at) VALUES (?,?,?)").run(POLL_LOCK_KEY, pid, now);
+    return true;
+  } catch { return true; } // if DB error, allow polling
+}
+
 function start() {
   if (!BOT_TOKEN) return;
   if (running) return;
@@ -376,10 +395,12 @@ function start() {
     send(ALLOWED_CHAT, "🤖 *Veridex Bot online*\n\nType /help for commands.\nType /agents to see your agents.").catch(() => {});
   }
 
-  // Poll loop
+  // Poll loop — only one Railway pod polls at a time via DB lock
   (async function loop() {
     while (running) {
-      await poll();
+      if (acquirePollLock()) {
+        await poll();
+      }
       await new Promise(r => setTimeout(r, 1000));
     }
   })().catch(e => console.error("[TelegramBot] Loop crashed:", e));
