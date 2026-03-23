@@ -1011,38 +1011,10 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
   const connectedWallet = address?.toLowerCase();
   const isOwner = !!ownerWallet && ownerWallet === connectedWallet;
   const isClaimed = !!ownerWallet;
-  // Claimed by someone else → show public-only view (trust score + HCS link, no controls)
-  if (isClaimed && !isOwner) {
-    return (
-      <>
-        <DashboardHeader />
-        <div style={{ maxWidth: "600px", margin: "120px auto", padding: "0 24px", textAlign: "center" }}>
-          <div style={{ fontSize: "18px", fontWeight: 700, marginBottom: "8px" }}>{agent.name || agent.id}</div>
-          <div style={{ fontSize: "13px", fontFamily: "monospace", color: "var(--text-tertiary)", marginBottom: "20px" }}>{agent.id}</div>
-          <div style={{ display: "flex", gap: "12px", justifyContent: "center", marginBottom: "24px" }}>
-            <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "14px 20px", textAlign: "center" }}>
-              <div style={{ fontSize: "20px", fontWeight: 700, fontFamily: "monospace" }}>{stats?.safetyScore ?? "—"}</div>
-              <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>safety score</div>
-            </div>
-            <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "14px 20px", textAlign: "center" }}>
-              <div style={{ fontSize: "20px", fontWeight: 700, fontFamily: "monospace" }}>{stats?.totalActions ?? "—"}</div>
-              <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>total actions</div>
-            </div>
-            {agent.hcs_topic_id && (
-              <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "14px 20px", textAlign: "center" }}>
-                <a href={`https://hashscan.io/testnet/topic/${agent.hcs_topic_id}`} target="_blank" rel="noopener" style={{ fontSize: "12px", fontFamily: "monospace", color: "#10b981", textDecoration: "none" }}>{agent.hcs_topic_id} ↗</a>
-                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>HCS audit trail</div>
-              </div>
-            )}
-          </div>
-          <div style={{ fontSize: "13px", color: "var(--text-tertiary)", marginBottom: "8px" }}>
-            Managed by <span style={{ fontFamily: "monospace" }}>{agent.owner_wallet?.slice(0, 6)}...{agent.owner_wallet?.slice(-4)}</span>
-          </div>
-          <Link href="/dashboard" style={{ color: "var(--accent)", fontSize: "13px" }}>← Back to Dashboard</Link>
-        </div>
-      </>
-    );
-  }
+  // Owner-only tabs — public visitors see activity, jobs, recovery only
+  const visibleTabs: Tab[] = isOwner
+    ? ["activity", "jobs", "earnings", "policies", "recovery", "settings", "delegations"]
+    : ["activity", "jobs", "recovery"];
 
   return (
     <>
@@ -1140,7 +1112,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
 
         {/* Tab bar */}
         <div id="tour-tab-bar" style={{ display: "flex", gap: "4px", borderBottom: "1px solid var(--border)", marginBottom: "28px", flexWrap: "wrap" }}>
-          {(["activity", "jobs", "earnings", "policies", "recovery", "settings", "delegations"] as Tab[]).map(t => (
+          {visibleTabs.map(t => (
             <button
               key={t}
               id={`tour-tab-${t}`}

@@ -2067,6 +2067,7 @@ process.on("SIGINT", () => {
     { id: "rogue-bot-demo",     name: "RogueBot",     wallet: "0xD21e831eF771277E7d5c05e17583210b9A25134e", hcs: "0.0.8228696" },
     { id: "data-bot-demo",      name: "DataBot",      wallet: process.env.DATA_BOT_ADDRESS  || "0xd9197748A698cF4a7B2FE82cB9AA3ed0aB60759d", hcs: "0.0.8268065" },
     { id: "api-bot-demo",       name: "APIBot",       wallet: process.env.API_BOT_ADDRESS   || "0x16f67cDF5F06F832e9B43E067bfb56e3D4250624", hcs: "0.0.8268072" },
+    { id: "market-scout-9z",    name: "market-scout-9z", wallet: "0xf1b067B8a3939B10785a08E1971984375556388c", hcs: "0.0.8348666" },
   ];
   for (const a of DEMO_AGENTS) {
     try {
@@ -2074,6 +2075,10 @@ process.on("SIGINT", () => {
       if (!existing) {
         db.upsertAgent({ id: a.id, name: a.name, ownerWallet: a.wallet, hcsTopicId: a.hcs });
         console.log(`[seed] Created demo agent: ${a.id}`);
+      } else if (!existing.owner_wallet) {
+        // Restore owner_wallet if it was lost (e.g. pod restart without persistent volume)
+        db.getDb().prepare("UPDATE agents SET owner_wallet = ?, hcs_topic_id = COALESCE(hcs_topic_id, ?) WHERE id = ?").run(a.wallet, a.hcs, a.id);
+        console.log(`[seed] Restored owner_wallet for ${a.id}`);
       }
     } catch (e) { console.error(`[seed] Failed to seed ${a.id}:`, e.message); }
   }
