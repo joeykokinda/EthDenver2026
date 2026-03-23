@@ -131,6 +131,9 @@ const DASHBOARD_TOUR_STEPS: TourStep[] = [
 
 function ExampleAgentWithTour() {
   const { step, next, skip, active } = useTour(DASHBOARD_TOUR_STEPS, true);
+  const [dismissed, setDismissed] = useState(false);
+
+  if (dismissed) return null;
 
   return (
     <>
@@ -145,7 +148,7 @@ function ExampleAgentWithTour() {
       </div>
 
       {/* Example agent card */}
-      <div id="example-agent-card" style={{ background: "var(--bg-secondary)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "10px", padding: "20px", display: "flex", flexDirection: "column", gap: "14px", maxWidth: "380px" }}>
+      <div id="example-agent-card" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "10px", padding: "20px", display: "flex", flexDirection: "column", gap: "14px", maxWidth: "380px" }}>
         {/* EXAMPLE badge */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ fontSize: "10px", background: "rgba(239,68,68,0.12)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "4px", padding: "2px 7px", fontWeight: 700, letterSpacing: "0.5px" }}>EXAMPLE</span>
@@ -155,18 +158,18 @@ function ExampleAgentWithTour() {
         {/* Name + status */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div style={{ fontSize: "16px", fontWeight: 700, marginBottom: "4px", color: "#c0392b" }}>RogueBot</div>
+            <div style={{ fontSize: "16px", fontWeight: 700, marginBottom: "4px", color: "var(--text-primary)" }}>RogueBot</div>
             <div style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--text-tertiary)" }}>rogue-bot-demo</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }} />
-            <span style={{ fontSize: "12px", color: "#ef4444" }}>Alert</span>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b" }} />
+            <span style={{ fontSize: "12px", color: "#f59e0b" }}>Alert</span>
           </div>
         </div>
 
         {/* Last action */}
-        <div style={{ fontSize: "13px", color: "#fca5a5", background: "var(--bg-tertiary)", borderRadius: "6px", padding: "10px 12px" }}>
-          <span style={{ color: "#c0392b", fontSize: "11px", fontWeight: 600, marginRight: "4px" }}>blocked:</span>
+        <div style={{ fontSize: "13px", color: "var(--text-secondary)", background: "var(--bg-tertiary)", borderRadius: "6px", padding: "10px 12px" }}>
+          <span style={{ color: "#f59e0b", fontSize: "11px", fontWeight: 600, marginRight: "4px" }}>blocked:</span>
           Attempted to read /etc/passwd
           <span style={{ color: "var(--text-tertiary)", fontSize: "11px", marginLeft: "8px" }}>2m ago</span>
         </div>
@@ -190,12 +193,23 @@ function ExampleAgentWithTour() {
           <Link
             id="view-agent-btn"
             href="/dashboard/rogue-bot-demo?tour=1"
-            style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "8px", background: "#ef4444", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, color: "#fff", textDecoration: "none" }}
+            style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "8px", background: "#10b981", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, color: "#000", textDecoration: "none" }}
           >
             View agent →
           </Link>
         </div>
       </div>
+
+      {!active && (
+        <div style={{ marginTop: "12px", textAlign: "center" }}>
+          <button
+            onClick={() => setDismissed(true)}
+            style={{ background: "none", border: "none", color: "var(--text-tertiary)", fontSize: "12px", cursor: "pointer", textDecoration: "underline" }}
+          >
+            Dismiss example
+          </button>
+        </div>
+      )}
 
       {active && <TourBubble steps={DASHBOARD_TOUR_STEPS} step={step} next={next} skip={skip} />}
     </>
@@ -209,8 +223,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [dismissedAlerts, setDismissed] = useState<Set<string>>(new Set());
 
-  const fetchAgents = useCallback(async (wallet: string) => {
-    setLoading(true);
+  const fetchAgents = useCallback(async (wallet: string, showSpinner = false) => {
+    if (showSpinner) setLoading(true);
     try {
       const r = await fetch(`/api/proxy/api/monitor/agents?wallet=${wallet}`);
       const walletAgents: AgentCard[] = r.ok ? (await r.json()).agents || [] : [];
@@ -226,13 +240,13 @@ export default function DashboardPage() {
       }
       setAgents([...walletAgents, ...extra]);
     } catch {}
-    setLoading(false);
+    if (showSpinner) setLoading(false);
   }, []);
 
   useEffect(() => {
     if (!address) return;
-    fetchAgents(address);
-    const iv = setInterval(() => fetchAgents(address), 8000);
+    fetchAgents(address, true);  // initial load shows skeleton
+    const iv = setInterval(() => fetchAgents(address), 30000);  // silent background poll
     return () => clearInterval(iv);
   }, [address, fetchAgents]);
 

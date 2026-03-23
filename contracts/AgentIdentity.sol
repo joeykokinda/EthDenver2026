@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 /**
  * @title AgentIdentity
  * @dev On-chain identity + dual reputation registry for AI agents on Hedera
- * Built for AgentTrust at ETHDenver 2026
+ * Built for AgentTrust
  *
  * Registration:
  *   registerVerified() - requires deployer signature → verifiedMachineAgent = true

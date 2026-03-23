@@ -1,7 +1,7 @@
 {
   "name": "veridex",
   "version": "1.0.0",
-  "description": "On-chain identity for AI agents - ETHDenver 2026",
+  "description": "On-chain identity for AI agents",
   "scripts": {
     "setup:validate": "node scripts/setup/validate.js",
     "setup:convert-key": "node scripts/setup/convert-hedera-key.js",
@@ -28,8 +28,7 @@
   "keywords": [
     "hedera",
     "ai-agents",
-    "blockchain",
-    "ethdenver"
+    "blockchain"
   ],
   "author": "",
   "license": "MIT",

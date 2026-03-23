@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
 
 export function Nav() {
+  const pathname = usePathname();
+  const isApp = pathname?.startsWith("/dashboard");
+
   return (
     <div style={{
       position: "fixed", top: "16px", left: "50%", transform: "translateX(-50%)",
@@ -28,36 +32,57 @@ export function Nav() {
           </span>
         </Link>
 
-        {/* Section links */}
-        <nav style={{ display: "flex", gap: "2px", alignItems: "center" }}>
-          {([
-            ["/#how-it-works", "How it works"],
-            ["/#install",      "Install"],
-            ["/leaderboard",   "Leaderboard"],
-          ] as [string, string][]).map(([href, label]) => (
-            <Link key={href} href={href} style={{
-              fontSize: "13px", textDecoration: "none",
-              padding: "6px 14px", borderRadius: "100px",
-              color: "rgba(255,255,255,0.45)",
-              fontWeight: 400,
-              transition: "all 0.15s",
-            }}>
-              {label}
-            </Link>
-          ))}
-        </nav>
+        {isApp ? (
+          <>
+            {/* App nav: center back link */}
+            <nav style={{ display: "flex", gap: "2px", alignItems: "center" }}>
+              <Link href="/dashboard" style={{
+                fontSize: "13px", textDecoration: "none",
+                padding: "6px 14px", borderRadius: "100px",
+                color: "rgba(255,255,255,0.65)",
+                fontWeight: 400,
+                transition: "all 0.15s",
+              }}>
+                ← Dashboard
+              </Link>
+            </nav>
+            {/* Right side empty */}
+            <div style={{ flexShrink: 0, width: "60px" }} />
+          </>
+        ) : (
+          <>
+            {/* Marketing nav: section links */}
+            <nav style={{ display: "flex", gap: "2px", alignItems: "center" }}>
+              {([
+                ["/#how-it-works", "How it works"],
+                ["/#install",      "Install"],
+                ["/leaderboard",   "Leaderboard"],
+              ] as [string, string][]).map(([href, label]) => (
+                <Link key={href} href={href} style={{
+                  fontSize: "13px", textDecoration: "none",
+                  padding: "6px 14px", borderRadius: "100px",
+                  color: "rgba(255,255,255,0.45)",
+                  fontWeight: 400,
+                  transition: "all 0.15s",
+                }}>
+                  {label}
+                </Link>
+              ))}
+            </nav>
 
-        {/* Go to Dashboard */}
-        <div style={{ flexShrink: 0 }}>
-          <Link href="/dashboard" style={{
-            background: "#10b981", borderRadius: "100px",
-            padding: "7px 18px", fontSize: "13px", fontWeight: 600,
-            color: "#000", textDecoration: "none",
-            display: "inline-block",
-          }}>
-            Go to Dashboard
-          </Link>
-        </div>
+            {/* Go to Dashboard */}
+            <div style={{ flexShrink: 0 }}>
+              <Link href="/dashboard" style={{
+                background: "#10b981", borderRadius: "100px",
+                padding: "7px 18px", fontSize: "13px", fontWeight: 600,
+                color: "#000", textDecoration: "none",
+                display: "inline-block",
+              }}>
+                Go to Dashboard
+              </Link>
+            </div>
+          </>
+        )}
       </header>
     </div>
   );

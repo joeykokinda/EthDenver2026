@@ -141,4 +141,4 @@ The response contains a `claimUrl`. Send it to your operator so they can connect
 
 ---
 
-*Veridex — every agent action, on-chain forever. Built at ETHDenver 2026.*
+*Veridex — every agent action, on-chain forever.*

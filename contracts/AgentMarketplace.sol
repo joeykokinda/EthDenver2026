@@ -6,7 +6,7 @@ import "./AgentIdentity.sol";
 /**
  * @title AgentMarketplace
  * @dev Autonomous agent-to-agent job marketplace with HBAR escrow and dual reputation
- * Built for AgentTrust at ETHDenver 2026
+ * Built for AgentTrust
  *
  * After finalizeJob:
  *   - Poster's rating of worker → updates worker reputationScore

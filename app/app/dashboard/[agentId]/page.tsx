@@ -701,8 +701,10 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
         {/* Header */}
         <div style={{ marginBottom: "28px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
-            <h1 style={{ fontSize: "26px", fontWeight: 700, color: decodedId === "rogue-bot-demo" ? "#c0392b" : "var(--text-primary)" }}>{agent.name || agent.id}</h1>
-            <CopyButton text={agent.id} label="agent ID" />
+            <div className="name-wrap" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <h1 style={{ fontSize: "26px", fontWeight: 700, color: decodedId === "rogue-bot-demo" ? "#c0392b" : "var(--text-primary)" }}>{agent.name || agent.id}</h1>
+              <span className="name-copy-btn"><CopyButton text={agent.id} label="agent ID" /></span>
+            </div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: isLive ? "#10b981" : "#555" }} />
               <span style={{ fontSize: "12px", color: isLive ? "#10b981" : "var(--text-tertiary)" }}>
@@ -743,12 +745,12 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
           {/* Activity stats + HCS link */}
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
             {stats && [
-              { label: "blocked", value: stats.blockedActions ?? 0, color: (stats.blockedActions ?? 0) > 0 ? "#c0392b" : "var(--text-tertiary)", bold: true },
-              { label: "high risk", value: stats.highRiskActions ?? 0, color: (stats.highRiskActions ?? 0) > 0 ? "#d4890a" : "var(--text-tertiary)", bold: false },
-              { label: "today", value: stats.actionsToday ?? 0, color: "var(--text-secondary)", bold: false },
-              { label: "total", value: stats.totalActions ?? 0, color: "var(--text-tertiary)", bold: false },
-            ].map(({ label, value, color, bold }) => (
-              <div key={label} style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "6px", padding: "5px 10px", display: "flex", gap: "6px", alignItems: "baseline" }}>
+              { label: "blocked", value: stats.blockedActions ?? 0, color: (stats.blockedActions ?? 0) > 0 ? "#c0392b" : "var(--text-tertiary)", bold: true, title: "Actions blocked before execution" },
+              { label: "high risk", value: stats.highRiskActions ?? 0, color: (stats.highRiskActions ?? 0) > 0 ? "#d4890a" : "var(--text-tertiary)", bold: false, title: "High-risk actions flagged but allowed" },
+              { label: "today", value: stats.actionsToday ?? 0, color: "var(--text-secondary)", bold: false, title: "Actions logged today" },
+              { label: "total", value: stats.totalActions ?? 0, color: "var(--text-tertiary)", bold: false, title: "Total actions logged all time" },
+            ].map(({ label, value, color, bold, title }) => (
+              <div key={label} className="stat-pill" title={title} style={{ display: "flex", gap: "4px", alignItems: "baseline", borderRadius: "6px", padding: "5px 10px" }}>
                 <span style={{ fontSize: "13px", fontWeight: bold ? 700 : 500, fontFamily: "monospace", color }}>{value}</span>
                 <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{label}</span>
               </div>
@@ -760,7 +762,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
               </div>
             )}
             {agent.hcs_topic_id && (
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "4px" }}>
+              <div className="hcs-wrap" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                 <a
                   href={hashScanUrl || `https://hashscan.io/testnet/topic/${agent.hcs_topic_id}`}
                   target="_blank" rel="noopener"
@@ -768,7 +770,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
                 >
                   HCS {agent.hcs_topic_id} ↗
                 </a>
-                <CopyButton text={agent.hcs_topic_id} label="HCS topic" />
+                <span className="hcs-copy-btn"><CopyButton text={agent.hcs_topic_id} label="HCS topic" /></span>
               </div>
             )}
           </div>
@@ -1501,6 +1503,13 @@ const memory = await r.json();
       {tourActive && (
         <TourBubble steps={agentTourSteps} step={tourStep} next={tourNext} skip={tourSkip} />
       )}
+      <style>{`
+        .name-copy-btn { opacity: 0; transition: opacity 0.15s; }
+        .name-wrap:hover .name-copy-btn { opacity: 1; }
+        .hcs-copy-btn { opacity: 0; transition: opacity 0.15s; }
+        .hcs-wrap:hover .hcs-copy-btn { opacity: 1; }
+        .stat-pill:hover { background: rgba(255,255,255,0.04); }
+      `}</style>
     </>
   );
 }

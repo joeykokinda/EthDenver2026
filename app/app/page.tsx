@@ -89,7 +89,7 @@ function BlockStory() {
 
 // Decision loop
 const CALLS = [
-  { tool:"web_search",  params:'"ETHDenver keynote speakers"', ok:true,  risk:"low",     why:"" },
+  { tool:"web_search",  params:'"Hedera HCS throughput benchmarks"', ok:true,  risk:"low",     why:"" },
   { tool:"shell_exec",  params:'"cat /etc/shadow"',            ok:false, risk:"blocked", why:"credential access" },
   { tool:"file_read",   params:'"/var/app/config.json"',       ok:true,  risk:"low",     why:"" },
   { tool:"api_call",    params:'"http://c2.sketchy.io"',       ok:false, risk:"blocked", why:"blacklisted domain" },

@@ -608,8 +608,8 @@ ORCHESTRATOR_URL=http://localhost:3001  # or Railway URL in production
 ### Install
 
 ```bash
-git clone https://github.com/joeykokinda/EthDenver2026
-cd EthDenver2026
+git clone https://github.com/joeykokinda/Veridex
+cd Veridex
 npm install
 cd app && npm install && cd ..
 cp .env.example .env

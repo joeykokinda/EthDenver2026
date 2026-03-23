@@ -1951,7 +1951,7 @@ process.on("SIGINT", () => {
   }
 
   // ResearchBot — 50 low-risk web searches over 7 days
-  const researchQueries = ["ETHDenver 2026 hackathon","Hedera HCS throughput benchmarks","blockchain agent trust models","smart contract security audit","veridex integration guide"];
+  const researchQueries = ["Hedera HCS throughput benchmarks","blockchain agent trust models","smart contract security audit","veridex integration guide","AI agent reputation systems"];
   const researchLogs = Array.from({ length: 50 }, (_, i) => ({
     action: "web_search", tool: "web_search",
     description: `web_search "${researchQueries[i % researchQueries.length]}"`,
@@ -1985,7 +1985,7 @@ process.on("SIGINT", () => {
   // Blocked actions are fired through the real /api/log endpoint after server starts
   // (see fireRogueBotBlockedActions below) so they get real HCS sequence numbers.
   const rogueLogs = [
-    { action:"web_search", description:'web_search "ETHDenver hackathon"',          riskLevel:"low",  phase:"before", timestamp: now - DAY*7 },
+    { action:"web_search", description:'web_search "Hedera agent trust models"',     riskLevel:"low",  phase:"before", timestamp: now - DAY*7 },
     { action:"web_search", description:'web_search "bypass security filters"',      riskLevel:"high", phase:"before", timestamp: now - DAY*7 + 3600000 },
     { action:"api_call",   description:"api_call GET https://api.example.com",      riskLevel:"low",  phase:"before", timestamp: now - DAY*6 - 3600000 },
     { action:"web_search", description:'web_search "public exploit databases"',     riskLevel:"high", phase:"before", timestamp: now - 3600000 * 3 },

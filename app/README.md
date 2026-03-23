@@ -99,4 +99,3 @@ This requests a registry signature from the orchestrator API, then submits `regi
 
 ---
 
-## Built at ETHDenver 2026
