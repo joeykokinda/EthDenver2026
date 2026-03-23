@@ -37,67 +37,128 @@ function statusDot(agent: AgentCard, recentLogs: Log[]) {
   return { dot: "#555", label: "Offline" };
 }
 
-function AgentCardUI({ agent, recentLogs }: { agent: AgentCard; recentLogs: Log[] }) {
+function DeleteModal({ agent, onConfirm, onCancel }: { agent: AgentCard; onConfirm: () => void; onCancel: () => void }) {
+  const [input, setInput] = useState("");
+  const agentName = agent.name || agent.id;
+  const confirmed = input === agentName;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}
+      onClick={onCancel}>
+      <div style={{ background: "var(--bg-secondary)", border: "1px solid rgba(239,68,68,0.4)", borderRadius: "12px", padding: "28px", maxWidth: "420px", width: "100%" }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: "18px", fontWeight: 700, marginBottom: "8px", color: "#fca5a5" }}>Remove agent</div>
+        <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px", lineHeight: "1.5" }}>
+          This removes <strong style={{ color: "var(--text-primary)" }}>{agentName}</strong> from your dashboard. The agent stays registered on-chain.
+        </p>
+        <p style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "8px" }}>
+          Type <strong style={{ color: "var(--text-primary)", fontFamily: "monospace" }}>{agentName}</strong> to confirm:
+        </p>
+        <input
+          autoFocus
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && confirmed) onConfirm(); if (e.key === "Escape") onCancel(); }}
+          placeholder={agentName}
+          style={{ width: "100%", boxSizing: "border-box", background: "var(--bg-tertiary)", border: `1px solid ${confirmed ? "rgba(239,68,68,0.6)" : "var(--border)"}`, borderRadius: "6px", padding: "9px 12px", fontSize: "13px", color: "var(--text-primary)", fontFamily: "monospace", outline: "none", marginBottom: "16px" }}
+        />
+        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+          <button onClick={onCancel} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: "6px", padding: "8px 16px", fontSize: "13px", color: "var(--text-secondary)", cursor: "pointer" }}>
+            Cancel
+          </button>
+          <button onClick={onConfirm} disabled={!confirmed} style={{ background: confirmed ? "#ef4444" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "6px", padding: "8px 16px", fontSize: "13px", fontWeight: 600, color: confirmed ? "#fff" : "rgba(239,68,68,0.4)", cursor: confirmed ? "pointer" : "not-allowed", transition: "all 0.15s" }}>
+            Remove
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentCardUI({ agent, recentLogs, onDelete }: { agent: AgentCard; recentLogs: Log[]; onDelete: (id: string) => void }) {
   const status = statusDot(agent, recentLogs);
   const myLogs = recentLogs.filter(l => l.agentId === agent.id);
   const lastLog = myLogs[0];
+  const [showDelete, setShowDelete] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copyId = () => {
+    navigator.clipboard.writeText(agent.id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handleDelete = () => {
+    onDelete(agent.id);
+    setShowDelete(false);
+  };
 
   return (
-    <div style={{ background: "var(--bg-secondary)", border: `1px solid ${agent.activeAlerts > 0 ? "rgba(239,68,68,0.4)" : "var(--border)"}`, borderRadius: "10px", padding: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
-      {"warning" in status && status.warning && (
-        <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 6, padding: "8px 12px", fontSize: 12, color: "#f59e0b" }}>
-          No recent activity — agent may be offline or skill not installed
-        </div>
-      )}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <div style={{ fontSize: "16px", fontWeight: 700, marginBottom: "4px" }}>{agent.name || agent.id}</div>
-          <div style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--text-tertiary)" }}>
-            {agent.id.length > 24 ? agent.id.slice(0, 24) + "..." : agent.id}
+    <>
+      {showDelete && <DeleteModal agent={agent} onConfirm={handleDelete} onCancel={() => setShowDelete(false)} />}
+      <div style={{ background: "var(--bg-secondary)", border: `1px solid ${agent.activeAlerts > 0 ? "rgba(239,68,68,0.4)" : "var(--border)"}`, borderRadius: "10px", padding: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+        {"warning" in status && status.warning && (
+          <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 6, padding: "8px 12px", fontSize: 12, color: "#f59e0b" }}>
+            No recent activity — agent may be offline or skill not installed
           </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: status.dot }} />
-          <span style={{ fontSize: "12px", color: status.dot }}>{status.label}</span>
-        </div>
-      </div>
-      <div style={{ fontSize: "13px", color: lastLog?.riskLevel === "blocked" ? "#fca5a5" : "var(--text-secondary)", background: "var(--bg-tertiary)", borderRadius: "6px", padding: "10px 12px", minHeight: "40px" }}>
-        {lastLog ? (
-          <>
-            {lastLog.riskLevel === "blocked" && <span style={{ color: "#c0392b", fontSize: "11px", fontWeight: 600, marginRight: "4px" }}>blocked:</span>}
-            {lastLog.description || lastLog.action}
-            <span style={{ color: "var(--text-tertiary)", fontSize: "11px", marginLeft: "8px" }}>{timeAgo(lastLog.timestamp)}</span>
-          </>
-        ) : (
-          <span style={{ color: "var(--text-tertiary)" }}>No actions recorded yet</span>
         )}
-      </div>
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-        {[
-          { label: "actions today", value: agent.stats.actionsToday, color: "var(--text-secondary)" },
-          { label: "blocked", value: agent.stats.blockedActions, color: agent.stats.blockedActions > 0 ? "#c0392b" : "var(--text-tertiary)" },
-          { label: "alerts", value: agent.activeAlerts, color: agent.activeAlerts > 0 ? "#f59e0b" : "var(--text-tertiary)" },
-          { label: "ℏ earned", value: agent.stats.totalEarned.toFixed(2), color: agent.stats.totalEarned > 0 ? "#f59e0b" : "var(--text-tertiary)" },
-        ].map(s => (
-          <div key={s.label} style={{ fontSize: "12px", padding: "3px 10px", background: "var(--bg-tertiary)", borderRadius: "20px", color: s.color, fontFamily: "monospace" }}>
-            <strong>{s.value}</strong> <span style={{ color: "var(--text-tertiary)" }}>{s.label}</span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: "16px", fontWeight: 700, marginBottom: "4px" }}>{agent.name || agent.id}</div>
+            <div style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--text-tertiary)" }}>
+              {agent.id.length > 24 ? agent.id.slice(0, 24) + "..." : agent.id}
+            </div>
           </div>
-        ))}
-      </div>
-      {agent.hcs_topic_id && (
-        <div style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--text-tertiary)" }}>
-          HCS: <a href={agent.hashScanUrl} target="_blank" rel="noopener" style={{ color: "#10b981", textDecoration: "none" }}>{agent.hcs_topic_id} ↗</a>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: status.dot }} />
+              <span style={{ fontSize: "12px", color: status.dot }}>{status.label}</span>
+            </div>
+            <button onClick={() => setShowDelete(true)} title="Remove agent" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-tertiary)", fontSize: "15px", padding: "2px 4px", lineHeight: 1, opacity: 0.6, transition: "opacity 0.15s" }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
+              onMouseLeave={e => (e.currentTarget.style.opacity = "0.6")}>
+              ✕
+            </button>
+          </div>
         </div>
-      )}
-      <div className="agent-card-btns" style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
-        <Link href={`/dashboard/${agent.id}`} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "8px", background: "#10b981", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, color: "#000", textDecoration: "none" }}>
-          View agent
-        </Link>
-        <Link href={`/dashboard/${agent.id}?tab=policies`} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "8px", background: "transparent", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "13px", color: "var(--text-secondary)", textDecoration: "none" }}>
-          Policies
-        </Link>
+        <div style={{ fontSize: "13px", color: lastLog?.riskLevel === "blocked" ? "#fca5a5" : "var(--text-secondary)", background: "var(--bg-tertiary)", borderRadius: "6px", padding: "10px 12px", minHeight: "40px" }}>
+          {lastLog ? (
+            <>
+              {lastLog.riskLevel === "blocked" && <span style={{ color: "#c0392b", fontSize: "11px", fontWeight: 600, marginRight: "4px" }}>blocked:</span>}
+              {lastLog.description || lastLog.action}
+              <span style={{ color: "var(--text-tertiary)", fontSize: "11px", marginLeft: "8px" }}>{timeAgo(lastLog.timestamp)}</span>
+            </>
+          ) : (
+            <span style={{ color: "var(--text-tertiary)" }}>No actions recorded yet</span>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          {[
+            { label: "actions today", value: agent.stats.actionsToday, color: "var(--text-secondary)" },
+            { label: "blocked", value: agent.stats.blockedActions, color: agent.stats.blockedActions > 0 ? "#c0392b" : "var(--text-tertiary)" },
+            { label: "alerts", value: agent.activeAlerts, color: agent.activeAlerts > 0 ? "#f59e0b" : "var(--text-tertiary)" },
+            { label: "ℏ earned", value: agent.stats.totalEarned.toFixed(2), color: agent.stats.totalEarned > 0 ? "#f59e0b" : "var(--text-tertiary)" },
+          ].map(s => (
+            <div key={s.label} style={{ fontSize: "12px", padding: "3px 10px", background: "var(--bg-tertiary)", borderRadius: "20px", color: s.color, fontFamily: "monospace" }}>
+              <strong>{s.value}</strong> <span style={{ color: "var(--text-tertiary)" }}>{s.label}</span>
+            </div>
+          ))}
+        </div>
+        {agent.hcs_topic_id && (
+          <div style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--text-tertiary)" }}>
+            HCS: <a href={agent.hashScanUrl} target="_blank" rel="noopener" style={{ color: "#10b981", textDecoration: "none" }}>{agent.hcs_topic_id} ↗</a>
+          </div>
+        )}
+        <div className="agent-card-btns" style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+          <Link href={`/dashboard/${agent.id}`} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "8px", background: "#10b981", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, color: "#000", textDecoration: "none" }}>
+            View agent
+          </Link>
+          <button onClick={copyId} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "5px", padding: "8px", background: "transparent", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "13px", color: copied ? "#10b981" : "var(--text-secondary)", cursor: "pointer", transition: "color 0.15s" }}>
+            {copied ? "✓ Copied" : "Copy ID"}
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -120,9 +181,30 @@ const DASHBOARD_TOUR_STEPS: TourStep[] = [
     nextLabel: "Next →",
   },
   {
+    targetId: "example-agent-card",
+    title: "Every action, on-chain forever",
+    body: "Each agent gets its own Hedera HCS topic. Every action — allowed or blocked — is written to it. The Hedera network orders the messages, not us. Nobody can delete or reorder them.",
+    position: "bottom",
+    nextLabel: "Next →",
+  },
+  {
+    targetId: "example-agent-card",
+    title: "Dangerous actions get stopped cold",
+    body: "Before your agent runs any action, it calls Veridex first. Shell injections, credential access, runaway loops — blocked before execution, logged to HCS permanently.",
+    position: "bottom",
+    nextLabel: "Next →",
+  },
+  {
+    targetId: "example-agent-card",
+    title: "Telegram kill-switch",
+    body: "Connect your Telegram in the agent's Settings tab. If something goes wrong at 3am, text /block <agentId> to the bot and the agent stops immediately. /unblock to resume.",
+    position: "bottom",
+    nextLabel: "Next →",
+  },
+  {
     targetId: "view-agent-btn",
     title: "Click in to explore",
-    body: "Open an agent to see its real-time activity feed, blocked threats, operator policies, and ERC-7715 delegations.",
+    body: "Open an agent to see its activity feed, blocked threats, operator policies, ERC-7715 delegations, and Telegram setup.",
     position: "bottom",
     action: { label: "Open RogueBot →", href: "/dashboard/rogue-bot-demo?tour=1" },
     nextLabel: "Skip",
@@ -266,6 +348,12 @@ export default function DashboardPage() {
     fetchLogs();
   }, [agents]);
 
+  const handleDeleteAgent = (id: string) => {
+    setAgents(prev => prev.filter(a => a.id !== id));
+    const claimed: string[] = JSON.parse(localStorage.getItem("veridex_claimed_agents") || "[]");
+    localStorage.setItem("veridex_claimed_agents", JSON.stringify(claimed.filter(c => c !== id)));
+  };
+
   const highAlertAgent = agents.find(a => a.activeAlerts > 0 && !dismissedAlerts.has(a.id));
 
   return (
@@ -336,7 +424,7 @@ export default function DashboardPage() {
               </Link>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
-              {agents.map(agent => <AgentCardUI key={agent.id} agent={agent} recentLogs={recentLogs} />)}
+              {agents.map(agent => <AgentCardUI key={agent.id} agent={agent} recentLogs={recentLogs} onDelete={handleDeleteAgent} />)}
             </div>
           </>
         )}

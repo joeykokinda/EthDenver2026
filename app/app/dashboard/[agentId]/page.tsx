@@ -87,12 +87,13 @@ interface Job {
 
 interface AgentMemory {
   agentId: string;
-  topicId: string;
-  messageCount: number;
+  hcsTopicId: string;
+  hcs_message_count: number;
   blocked_actions: Array<{ seq: number; action: string; reason: string; timestamp?: string }>;
   open_jobs: Array<{ jobId: string; status: string; amount?: number }>;
   recent_completions: Array<{ jobId: string; amount?: number; timestamp?: string }>;
-  pending_earnings: Array<{ amount?: number; source?: string }>;
+  pending_earnings: number;
+  lifetime_stats: { totalActions: number; blockedActions: number; safetyScore: number };
   summary: string;
 }
 
@@ -150,6 +151,226 @@ const JOB_STATUS_COLORS: Record<string, string> = {
   Posted: "#3b82f6", Funded: "#f59e0b", Submitted: "#14b8a6",
   Completed: "#10b981", Cancelled: "#6b7280", Failed: "#ef4444",
 };
+
+function scoreColor(value: number, threshHigh: number, threshMid: number) {
+  return value >= threshHigh ? "#10b981" : value >= threshMid ? "#d4890a" : "#ef4444";
+}
+
+function ConnectAgentGuide({ agentId }: { agentId: string }) {
+  const skillUrl = "https://veridex.sbs/skill.md";
+  const [copiedSkill, setCopiedSkill] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
+
+  function copy(text: string, setCopied: (v: boolean) => void) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div style={{ padding: "8px 0 40px" }}>
+      {/* Heading */}
+      <div style={{ marginBottom: "28px" }}>
+        <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "6px" }}>Connect your agent in 2 steps</div>
+        <div style={{ fontSize: "13px", color: "var(--text-tertiary)", lineHeight: 1.6 }}>
+          Your agent is registered. Now point it at Veridex so every action gets checked and logged here automatically.
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "14px", maxWidth: "620px" }}>
+        {/* Step 1 */}
+        <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "10px", padding: "18px 20px" }}>
+          <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+            <span style={{ fontSize: "11px", fontFamily: "monospace", color: "#10b981", fontWeight: 700, marginTop: "2px", flexShrink: 0 }}>01</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "6px" }}>Add the Veridex skill to your agent</div>
+              <div style={{ fontSize: "13px", color: "var(--text-tertiary)", marginBottom: "12px", lineHeight: 1.6 }}>
+                In your OpenClaw (or any MCP-compatible agent) config, add the skill URL:
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "var(--bg-tertiary)", borderRadius: "6px", padding: "10px 14px" }}>
+                <code style={{ flex: 1, fontSize: "12px", fontFamily: "monospace", color: "#10b981", wordBreak: "break-all" }}>
+                  {`{ "skills": ["${skillUrl}"] }`}
+                </code>
+                <button
+                  onClick={() => copy(`{ "skills": ["${skillUrl}"] }`, setCopiedSkill)}
+                  style={{ background: "none", border: "1px solid var(--border)", borderRadius: "4px", padding: "3px 10px", fontSize: "11px", color: copiedSkill ? "#10b981" : "var(--text-tertiary)", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
+                >
+                  {copiedSkill ? "copied ✓" : "copy"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Step 2 */}
+        <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "10px", padding: "18px 20px" }}>
+          <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+            <span style={{ fontSize: "11px", fontFamily: "monospace", color: "#10b981", fontWeight: 700, marginTop: "2px", flexShrink: 0 }}>02</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "6px" }}>Use your agent ID when logging</div>
+              <div style={{ fontSize: "13px", color: "var(--text-tertiary)", marginBottom: "12px", lineHeight: 1.6 }}>
+                Veridex automatically reads the agent ID from the skill. Your agent&apos;s ID is:
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "var(--bg-tertiary)", borderRadius: "6px", padding: "10px 14px" }}>
+                <code style={{ flex: 1, fontSize: "12px", fontFamily: "monospace", color: "rgba(255,255,255,0.7)", wordBreak: "break-all" }}>
+                  {agentId}
+                </code>
+                <button
+                  onClick={() => copy(agentId, setCopiedId)}
+                  style={{ background: "none", border: "1px solid var(--border)", borderRadius: "4px", padding: "3px 10px", fontSize: "11px", color: copiedId ? "#10b981" : "var(--text-tertiary)", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
+                >
+                  {copiedId ? "copied ✓" : "copy"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Waiting indicator */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "14px 16px", background: "rgba(16,185,129,0.04)", border: "1px solid rgba(16,185,129,0.15)", borderRadius: "8px" }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981", animation: "pulse 2s infinite", flexShrink: 0 }} />
+          <span style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>
+            Waiting for your first action — this page will update automatically once your agent connects.
+          </span>
+        </div>
+      </div>
+      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
+    </div>
+  );
+}
+
+function ScoreRing({ value, max = 1000, label, threshHigh, threshMid }: {
+  value: number; max?: number; label: string; threshHigh: number; threshMid: number;
+}) {
+  const color = scoreColor(value, threshHigh, threshMid);
+  const r = 30;
+  const circumference = 2 * Math.PI * r;
+  const pct = Math.min(Math.max(value / max, 0), 1);
+  const dash = pct * circumference;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+      <div style={{ position: "relative", width: 80, height: 80 }}>
+        <svg width="80" height="80" style={{ transform: "rotate(-90deg)" }}>
+          <circle cx="40" cy="40" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="6" />
+          <circle cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="6"
+            strokeDasharray={`${dash} ${circumference}`} strokeLinecap="round" />
+        </svg>
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontSize: "17px", fontWeight: 700, fontFamily: "monospace", color, lineHeight: 1 }}>{value}</span>
+          <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>/{max}</span>
+        </div>
+      </div>
+      <span style={{ fontSize: "11px", color: "var(--text-tertiary)", letterSpacing: "0.2px" }}>{label}</span>
+    </div>
+  );
+}
+
+function EmptyGuide({ steps, note }: {
+  steps: { num: string; title: string; body: string; code?: string }[];
+  note?: string;
+}) {
+  return (
+    <div style={{ padding: "8px 0 40px", maxWidth: "620px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        {steps.map(s => (
+          <div key={s.num} style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "10px", padding: "18px 20px" }}>
+            <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+              <span style={{ fontSize: "11px", fontFamily: "monospace", color: "#10b981", fontWeight: 700, marginTop: "2px", flexShrink: 0 }}>{s.num}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "6px" }}>{s.title}</div>
+                <div style={{ fontSize: "13px", color: "var(--text-tertiary)", lineHeight: 1.65, marginBottom: s.code ? "12px" : 0 }}>{s.body}</div>
+                {s.code && (
+                  <pre style={{ margin: 0, background: "var(--bg-tertiary)", borderRadius: "6px", padding: "10px 14px", fontSize: "12px", fontFamily: "monospace", color: "rgba(255,255,255,0.6)", whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{s.code}</pre>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+        {note && (
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", background: "rgba(16,185,129,0.04)", border: "1px solid rgba(16,185,129,0.15)", borderRadius: "8px" }}>
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#10b981", animation: "pulse 2s infinite", flexShrink: 0 }} />
+            <span style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>{note}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function JobsEmptyGuide() {
+  return (
+    <EmptyGuide
+      steps={[
+        {
+          num: "01",
+          title: "How jobs work",
+          body: "Operators post jobs on-chain via the ERC-8183 marketplace. Your agent accepts a job, does the work, submits a deliverable hash, and gets paid in HBAR automatically.",
+          code: `# Post a job (operator)\ncurl -X POST https://veridex.sbs/api/proxy/v2/jobs \\\n  -d '{"description":"Summarize report","amount":5,"agentId":"<your-id>"}'`,
+        },
+        {
+          num: "02",
+          title: "Accept a job in your agent",
+          body: "Your agent calls the jobs endpoint to find open work, then accepts and completes it. The skill handles this automatically once installed.",
+          code: `GET /api/proxy/v2/jobs          # list open jobs\nPOST /api/proxy/v2/jobs/:id/accept\nPOST /api/proxy/v2/jobs/:id/complete`,
+        },
+      ]}
+      note="Waiting for job activity — jobs will appear here once your agent accepts or is assigned one."
+    />
+  );
+}
+
+function EarningsEmptyGuide() {
+  return (
+    <EmptyGuide
+      steps={[
+        {
+          num: "01",
+          title: "How earnings work",
+          body: "When your agent completes a job, the HBAR payment is split between developer, operator, and reinvestment wallets according to your split config. Every payout is logged to Hedera HCS as an immutable paystub.",
+        },
+        {
+          num: "02",
+          title: "Configure your split",
+          body: "Go to the Earnings tab split config (scroll down) to set your percentages: dev / ops / reinvest must add up to 100%. Changes apply to the next payout.",
+          code: `Default split:\n  Developer  60%\n  Operator   30%\n  Reinvest   10%`,
+        },
+        {
+          num: "03",
+          title: "Complete a job to earn",
+          body: "Earnings only appear after a job is completed and payment is released. Check the Jobs tab to see open or in-progress work for this agent.",
+        },
+      ]}
+      note="No earnings yet — complete your first job to see the payout breakdown here."
+    />
+  );
+}
+
+function RecoveryEmptyGuide() {
+  return (
+    <EmptyGuide
+      steps={[
+        {
+          num: "01",
+          title: "What memory recovery is",
+          body: "Every action your agent takes is written to a Hedera HCS topic — an immutable, tamper-proof log. If your agent restarts, loses wifi, or crashes, it reads this topic to recover its full context: open jobs, blocked actions, pending earnings.",
+        },
+        {
+          num: "02",
+          title: "Why there's nothing here yet",
+          body: "Recovery context is built from HCS messages. Your agent hasn't logged any actions yet, so there's nothing to recover. Once activity starts flowing (Activity tab), this section will show a live snapshot of recoverable state.",
+          code: `GET /api/proxy/v2/agent/:id/memory\n→ { openJobs, blockedActions, pendingEarnings, summary }`,
+        },
+        {
+          num: "03",
+          title: "How your agent uses it",
+          body: "On startup, your agent calls the memory endpoint. Veridex replays the HCS topic and returns structured context so the agent picks up exactly where it left off — no local state files needed.",
+        },
+      ]}
+      note="Waiting for HCS history — memory recovery data appears after your agent logs its first actions."
+    />
+  );
+}
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -701,8 +922,11 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
         {/* Header */}
         <div style={{ marginBottom: "28px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
-            <div className="name-wrap" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div className="name-wrap" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <h1 style={{ fontSize: "26px", fontWeight: 700, color: decodedId === "rogue-bot-demo" ? "#c0392b" : "var(--text-primary)" }}>{agent.name || agent.id}</h1>
+              <span style={{ fontSize: "12px", fontFamily: "monospace", color: "var(--text-tertiary)" }}>
+                {agent.id.length > 20 ? agent.id.slice(0, 10) + "…" + agent.id.slice(-6) : agent.id}
+              </span>
               <span className="name-copy-btn"><CopyButton text={agent.id} label="agent ID" /></span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -718,27 +942,11 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
             )}
           </div>
 
-          {/* Scores — primary metrics */}
+          {/* Scores — donut rings */}
           {stats && (
-            <div id="tour-agent-stats" style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "10px" }}>
-              <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "6px", padding: "10px 16px", minWidth: "110px" }}>
-                <div style={{
-                  fontSize: "22px", fontWeight: 700, fontFamily: "monospace", lineHeight: 1,
-                  color: (stats.safetyScore ?? 1000) >= 900 ? "#10b981" : (stats.safetyScore ?? 1000) >= 600 ? "#d4890a" : "#c0392b"
-                }}>
-                  {stats.safetyScore ?? 1000}
-                </div>
-                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>safety score</div>
-              </div>
-              <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "6px", padding: "10px 16px", minWidth: "110px" }}>
-                <div style={{
-                  fontSize: "22px", fontWeight: 700, fontFamily: "monospace", lineHeight: 1,
-                  color: (stats.reputationScore ?? 500) >= 700 ? "#10b981" : (stats.reputationScore ?? 500) >= 400 ? "#d4890a" : "#c0392b"
-                }}>
-                  {stats.reputationScore ?? 500}
-                </div>
-                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>reputation</div>
-              </div>
+            <div id="tour-agent-stats" style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginBottom: "12px", alignItems: "flex-start" }}>
+              <ScoreRing value={stats.safetyScore ?? 1000} label="safety score" threshHigh={900} threshMid={600} />
+              <ScoreRing value={stats.reputationScore ?? 500} label="reputation"  threshHigh={700} threshMid={400} />
             </div>
           )}
 
@@ -834,9 +1042,13 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
             </div>
 
             {filteredLogs.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "60px", color: "var(--text-tertiary)", fontSize: "14px" }}>
-                {allLogs.length === 0 ? "No activity yet. Start your agent to see logs here." : "No entries match this filter."}
-              </div>
+              allLogs.length === 0 ? (
+                <ConnectAgentGuide agentId={decodedId} />
+              ) : (
+                <div style={{ textAlign: "center", padding: "60px", color: "var(--text-tertiary)", fontSize: "14px" }}>
+                  No entries match this filter.
+                </div>
+              )
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
                 {filteredLogs.map((log, i) => (
@@ -890,9 +1102,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
         {tab === "jobs" && (
           <div>
             {jobs.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "60px", color: "var(--text-tertiary)", fontSize: "14px" }}>
-                No ERC-8183 jobs found for this agent.
-              </div>
+              <JobsEmptyGuide />
             ) : (
               <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", overflow: "hidden" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 100px 120px auto", gap: "12px", padding: "10px 16px", borderBottom: "1px solid var(--border)", fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
@@ -939,9 +1149,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
             </div>
 
             {earnings.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px", color: "var(--text-tertiary)", fontSize: "14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px" }}>
-                No earnings recorded yet.
-              </div>
+              <EarningsEmptyGuide />
             ) : (
               <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", overflow: "hidden" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 200px 120px auto", gap: "12px", padding: "10px 16px", borderBottom: "1px solid var(--border)", fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
@@ -1140,40 +1348,83 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
               </div>
             )}
 
-            {/* Notifications */}
-            <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "20px", marginTop: activeAlerts.length > 0 ? "24px" : "0" }}>
-              <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "4px" }}>Notifications</div>
-              <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "14px" }}>Get a Telegram message when this agent is blocked or triggers a high-risk alert.</div>
-              <div style={{ display: "flex", gap: "10px", alignItems: "flex-end", flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: "180px" }}>
-                  <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px" }}>Telegram Chat ID</div>
-                  <input
-                    type="text"
-                    placeholder="e.g. -100123456789"
-                    value={telegramChatId}
-                    onChange={e => setTelegramChatId(e.target.value)}
-                    style={{ width: "100%", padding: "8px 10px", fontSize: "13px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-primary)", fontFamily: "monospace", outline: "none", boxSizing: "border-box" as const }}
-                  />
+            {/* Telegram — full docs + setup */}
+            <div style={{ marginTop: activeAlerts.length > 0 ? "24px" : "0", display: "flex", flexDirection: "column", gap: "12px" }}>
+
+              {/* What it does + commands */}
+              <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "20px" }}>
+                <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>Telegram integration</div>
+                <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.7, marginBottom: "16px" }}>
+                  Connect <span style={{ fontFamily: "monospace", color: "var(--text-primary)" }}>@veridex_manager_bot</span> to get instant alerts when this agent hits a blocked action or high-risk event — no dashboard login required. You can also manage your full fleet directly from Telegram.
                 </div>
-                <button
-                  onClick={saveTelegramConfig}
-                  disabled={telegramSaving || !telegramChatId.trim()}
-                  style={{ padding: "8px 16px", background: "var(--accent)", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, color: "#000", cursor: "pointer", opacity: (telegramSaving || !telegramChatId.trim()) ? 0.5 : 1, whiteSpace: "nowrap" }}
-                >
-                  {telegramSaved ? "Saved" : telegramSaving ? "Saving..." : "Save"}
-                </button>
-                <button
-                  onClick={testTelegramConfig}
-                  disabled={telegramTesting}
-                  style={{ padding: "8px 16px", background: "transparent", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "13px", color: "var(--text-secondary)", cursor: "pointer", opacity: telegramTesting ? 0.5 : 1, whiteSpace: "nowrap" }}
-                >
-                  {telegramTesting ? "Sending..." : "Test"}
-                </button>
-                {telegramTestMsg && (
-                  <span style={{ fontSize: "12px", color: telegramTestMsg.startsWith("Sent") ? "var(--accent)" : "#c0392b" }}>
-                    {telegramTestMsg}
-                  </span>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px" }}>Available commands</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+                  {[
+                    { cmd: "/agents", desc: "List all registered agents with live status and blocked counts" },
+                    { cmd: `/status ${decodedId}`, desc: "Full stats — actions, blocks, trust score, earnings" },
+                    { cmd: `/logs ${decodedId}`, desc: "Recent activity feed for this agent" },
+                    { cmd: `/block ${decodedId}`, desc: "Quarantine this agent — all future actions blocked immediately" },
+                    { cmd: `/unblock ${decodedId}`, desc: "Restore a quarantined agent" },
+                    { cmd: "/status", desc: "System-wide health — all agents, total actions today, active alerts" },
+                  ].map(({ cmd, desc }) => (
+                    <div key={cmd} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                      <span style={{ fontFamily: "monospace", fontSize: "11px", color: "var(--accent)", background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.15)", borderRadius: "4px", padding: "2px 7px", whiteSpace: "nowrap", flexShrink: 0 }}>{cmd}</span>
+                      <span style={{ fontSize: "12px", color: "var(--text-tertiary)", lineHeight: 1.6, paddingTop: "2px" }}>{desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* How to get chat ID */}
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "10px" }}>How to get your chat ID</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {[
+                    "Open Telegram and search for @veridex_manager_bot",
+                    "Send /start — the bot replies with your chat ID",
+                    "Copy the number (looks like -100123456789 for groups, a plain number for DMs) and paste it below",
+                  ].map((text, i) => (
+                    <div key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                      <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--accent)", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "50%", width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "1px" }}>{i + 1}</span>
+                      <span style={{ fontSize: "12px", color: "var(--text-tertiary)", lineHeight: 1.6 }}>{text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Connect form */}
+              <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "10px" }}>
+                  {agent.telegram_chat_id ? "Connected — update chat ID" : "Connect Telegram"}
+                </div>
+                {agent.telegram_chat_id && (
+                  <div style={{ fontSize: "12px", color: "var(--accent)", marginBottom: "10px" }}>
+                    Alerts are active for this agent
+                  </div>
                 )}
+                <div style={{ display: "flex", gap: "10px", alignItems: "flex-end", flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: "180px" }}>
+                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px" }}>Chat ID</div>
+                    <input
+                      type="text"
+                      placeholder="e.g. -100123456789"
+                      value={telegramChatId}
+                      onChange={e => setTelegramChatId(e.target.value)}
+                      style={{ width: "100%", padding: "8px 10px", fontSize: "13px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-primary)", fontFamily: "monospace", outline: "none", boxSizing: "border-box" as const }}
+                    />
+                  </div>
+                  <button onClick={saveTelegramConfig} disabled={telegramSaving || !telegramChatId.trim()} style={{ padding: "8px 16px", background: "var(--accent)", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, color: "#000", cursor: "pointer", opacity: (telegramSaving || !telegramChatId.trim()) ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                    {telegramSaved ? "Saved" : telegramSaving ? "Saving..." : "Save"}
+                  </button>
+                  <button onClick={testTelegramConfig} disabled={telegramTesting} style={{ padding: "8px 16px", background: "transparent", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "13px", color: "var(--text-secondary)", cursor: "pointer", opacity: telegramTesting ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                    {telegramTesting ? "Sending..." : "Send test"}
+                  </button>
+                  {telegramTestMsg && (
+                    <span style={{ fontSize: "12px", color: telegramTestMsg.startsWith("Sent") ? "var(--accent)" : "#c0392b" }}>
+                      {telegramTestMsg}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1192,15 +1443,13 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
             {memoryLoading ? (
               <div style={{ textAlign: "center", padding: "40px", color: "var(--text-tertiary)", fontSize: "14px" }}>Reading Hedera HCS...</div>
             ) : !memory ? (
-              <div style={{ textAlign: "center", padding: "40px", color: "var(--text-tertiary)", fontSize: "14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px" }}>
-                {agent.hcs_topic_id ? "No HCS messages yet. Start your agent to build history." : "No HCS topic assigned to this agent."}
-              </div>
+              <RecoveryEmptyGuide />
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" }}>
                   {[
-                    { label: "HCS Messages", value: memory.messageCount, color: "var(--accent)" },
-                    { label: "Blocked Actions", value: memory.blocked_actions.length, color: "#ef4444" },
+                    { label: "HCS Messages", value: memory.hcs_message_count ?? memory.lifetime_stats?.totalActions ?? 0, color: "var(--accent)" },
+                    { label: "Blocked Actions", value: memory.blocked_actions.length || memory.lifetime_stats?.blockedActions || 0, color: "#c0392b" },
                     { label: "Open Jobs", value: memory.open_jobs.length, color: "#f59e0b" },
                     { label: "Completions", value: memory.recent_completions.length, color: "#10b981" },
                   ].map(({ label, value, color }) => (
