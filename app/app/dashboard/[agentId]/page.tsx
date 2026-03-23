@@ -750,13 +750,13 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
               { label: "today", value: stats.actionsToday ?? 0, color: "var(--text-secondary)", bold: false, title: "Actions logged today" },
               { label: "total", value: stats.totalActions ?? 0, color: "var(--text-tertiary)", bold: false, title: "Total actions logged all time" },
             ].map(({ label, value, color, bold, title }) => (
-              <div key={label} className="stat-pill" title={title} style={{ display: "flex", gap: "4px", alignItems: "baseline", borderRadius: "6px", padding: "5px 10px" }}>
+              <div key={label} title={title} style={{ display: "flex", gap: "4px", alignItems: "baseline", padding: "2px 0" }}>
                 <span style={{ fontSize: "13px", fontWeight: bold ? 700 : 500, fontFamily: "monospace", color }}>{value}</span>
                 <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{label}</span>
               </div>
             ))}
             {totalEarned > 0 && (
-              <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "6px", padding: "5px 10px", display: "flex", gap: "6px", alignItems: "baseline" }}>
+              <div style={{ display: "flex", gap: "4px", alignItems: "baseline", padding: "2px 0" }}>
                 <span style={{ fontSize: "13px", fontWeight: 500, fontFamily: "monospace", color: "#d4890a" }}>{totalEarned.toFixed(4)} HBAR</span>
                 <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>earned</span>
               </div>
