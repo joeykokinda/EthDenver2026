@@ -2071,15 +2071,8 @@ process.on("SIGINT", () => {
   ];
   for (const a of DEMO_AGENTS) {
     try {
-      const existing = db.getAgent(a.id);
-      if (!existing) {
-        db.upsertAgent({ id: a.id, name: a.name, ownerWallet: a.wallet, hcsTopicId: a.hcs });
-        console.log(`[seed] Created demo agent: ${a.id}`);
-      } else if (!existing.owner_wallet) {
-        // Restore owner_wallet if it was lost (e.g. pod restart without persistent volume)
-        db.getDb().prepare("UPDATE agents SET owner_wallet = ?, hcs_topic_id = COALESCE(hcs_topic_id, ?) WHERE id = ?").run(a.wallet, a.hcs, a.id);
-        console.log(`[seed] Restored owner_wallet for ${a.id}`);
-      }
+      db.upsertAgent({ id: a.id, name: a.name, ownerWallet: a.wallet, hcsTopicId: a.hcs });
+      console.log(`[seed] Upserted demo agent: ${a.id}`);
     } catch (e) { console.error(`[seed] Failed to seed ${a.id}:`, e.message); }
   }
 

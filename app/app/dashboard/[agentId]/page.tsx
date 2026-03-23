@@ -1011,10 +1011,6 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
   const connectedWallet = address?.toLowerCase();
   const isOwner = !!ownerWallet && ownerWallet === connectedWallet;
   const isClaimed = !!ownerWallet;
-  // Owner-only tabs — public visitors see activity, jobs, recovery only
-  const visibleTabs: Tab[] = isOwner
-    ? ["activity", "jobs", "earnings", "policies", "recovery", "settings", "delegations"]
-    : ["activity", "jobs", "recovery"];
 
   return (
     <>
@@ -1112,7 +1108,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
 
         {/* Tab bar */}
         <div id="tour-tab-bar" style={{ display: "flex", gap: "4px", borderBottom: "1px solid var(--border)", marginBottom: "28px", flexWrap: "wrap" }}>
-          {visibleTabs.map(t => (
+          {(["activity", "jobs", "earnings", "policies", "recovery", "settings", "delegations"] as Tab[]).map(t => (
             <button
               key={t}
               id={`tour-tab-${t}`}
