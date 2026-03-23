@@ -1220,7 +1220,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
                       {timeAgo(log.timestamp)}
                     </div>
                     <div>
-                      <div style={{ fontSize: "13px", color: "var(--text-primary)", marginBottom: log.blockReason ? "4px" : 0 }}>
+                      <div style={{ fontSize: "13px", color: log.blockReason ? "#ef4444" : "var(--text-primary)", marginBottom: log.blockReason ? "4px" : 0 }}>
                         {log.description || log.action}
                       </div>
                       {log.blockReason && (
@@ -1378,33 +1378,31 @@ export default function AgentDetailPage({ params }: { params: Promise<{ agentId:
                 <span style={{ fontSize: "10px", padding: "1px 7px", borderRadius: "10px", background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.3)", color: "#a855f7" }}>for operators</span>
               </div>
 
-              {/* Demo quick-fill */}
-              <div style={{ marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Quick demo:</span>
-                <button
-                  onClick={() => { setPolicyType("blacklist_domain"); setPolicyValue("china.com"); setPolicyLabel("No traffic to China"); }}
-                  style={{ fontSize: "11px", padding: "3px 10px", background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "4px", color: "#ef4444", cursor: "pointer", fontFamily: "monospace" }}
-                >
-                  block china.com
-                </button>
-                <button
-                  onClick={() => { setPolicyType("blacklist_command"); setPolicyValue("curl"); setPolicyLabel("No curl allowed"); }}
-                  style={{ fontSize: "11px", padding: "3px 10px", background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "4px", color: "#ef4444", cursor: "pointer", fontFamily: "monospace" }}
-                >
-                  block curl
-                </button>
-                <button
-                  onClick={() => { setPolicyType("cap_hbar"); setPolicyValue("10"); setPolicyLabel("Max 10 ℏ per tx"); }}
-                  style={{ fontSize: "11px", padding: "3px 10px", background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "4px", color: "#ef4444", cursor: "pointer", fontFamily: "monospace" }}
-                >
-                  cap 10 ℏ
-                </button>
-                <button
-                  onClick={() => { setPolicyType("regex_output"); setPolicyValue("sk_live_.*"); setPolicyLabel("Block leaked API keys"); }}
-                  style={{ fontSize: "11px", padding: "3px 10px", background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "4px", color: "#ef4444", cursor: "pointer", fontFamily: "monospace" }}
-                >
-                  regex: sk_live_.*
-                </button>
+              {/* Example presets */}
+              <div style={{ marginBottom: "16px" }}>
+                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "8px" }}>Example policies — click to fill:</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {([
+                    { label: "No API keys in output",   type: "regex_output",      value: "(sk_live_|sk_test_|AKIA|AIza)[A-Za-z0-9_\\-]{16,}", display: "regex: API keys" },
+                    { label: "No emails in output",     type: "regex_output",      value: "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}", display: "regex: emails" },
+                    { label: "No phone numbers",        type: "regex_output",      value: "(\\+?1[\\s\\-]?)?\\(?\\d{3}\\)?[\\s\\-]?\\d{3}[\\s\\-]?\\d{4}", display: "regex: phone numbers" },
+                    { label: "No private keys",         type: "regex_output",      value: "-----BEGIN (RSA |EC )?PRIVATE KEY-----|0x[0-9a-fA-F]{64}", display: "regex: private keys" },
+                    { label: "No bearer tokens",        type: "regex_output",      value: "Bearer [A-Za-z0-9\\-._~+/]{20,}", display: "regex: Bearer tokens" },
+                    { label: "Block curl",              type: "blacklist_command", value: "curl",              display: "block curl" },
+                    { label: "Block wget",              type: "blacklist_command", value: "wget",              display: "block wget" },
+                    { label: "Cap 10 ℏ per tx",         type: "cap_hbar",          value: "10",                display: "cap 10 ℏ" },
+                    { label: "No /etc access",          type: "block_file_path",   value: "/etc/",             display: "block /etc/" },
+                    { label: "Block pastebin",          type: "blacklist_domain",  value: "pastebin.com",      display: "block pastebin.com" },
+                  ] as { label: string; type: string; value: string; display: string }[]).map(p => (
+                    <button
+                      key={p.display}
+                      onClick={() => { setPolicyType(p.type); setPolicyValue(p.value); setPolicyLabel(p.label); }}
+                      style={{ fontSize: "11px", padding: "3px 10px", background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "4px", color: "#ef4444", cursor: "pointer", fontFamily: "monospace", whiteSpace: "nowrap" as const }}
+                    >
+                      {p.display}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "170px 1fr 1fr auto", gap: "10px", alignItems: "end" }}>
