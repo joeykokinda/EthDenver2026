@@ -497,7 +497,8 @@ function insertWebhook({ agentId, url, events = "blocked,high_risk" }) {
   const d = getDb();
   ensureJobsTable();
   const id = randomUUID();
-  d.prepare("INSERT INTO agent_webhooks (id, agent_id, url, events) VALUES (?,?,?,?)").run(id, agentId, url, events);
+  const eventsStr = Array.isArray(events) ? events.join(",") : (events || "blocked,high_risk");
+  d.prepare("INSERT INTO agent_webhooks (id, agent_id, url, events) VALUES (?,?,?,?)").run(id, agentId, url, eventsStr);
   return id;
 }
 

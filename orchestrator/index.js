@@ -766,6 +766,23 @@ app.get("/api/monitor/agents", (req, res) => {
 });
 
 /**
+ * GET /api/monitor/agent/:agentId
+ * Basic agent info (used by dashboard for localStorage-claimed agents).
+ */
+app.get("/api/monitor/agent/:agentId", (req, res) => {
+  const agent = db.getAgent(req.params.agentId);
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+  res.json({
+    agent: {
+      ...agent,
+      stats: db.getAgentStats(agent.id),
+      activeAlerts: db.getActiveAlertCount(agent.id),
+      hashScanUrl: agent.hcs_topic_id ? topicHashScanUrl(agent.hcs_topic_id) : null
+    }
+  });
+});
+
+/**
  * GET /api/monitor/agent/:agentId/feed
  * Paginated log history for an agent.
  */
