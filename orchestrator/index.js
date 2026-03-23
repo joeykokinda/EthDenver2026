@@ -1543,7 +1543,16 @@ app.post("/v2/join", async (req, res) => {
   }
 
   // Create HCS topic if this agent doesn't have one yet
+  // forceNewTopic: true clears the dead topic ID and creates a fresh one
+  // (use after testnet resets wipe existing topics)
   let hcsTopicId = agentRecord?.hcs_topic_id || null;
+  const forceNewTopic = req.body?.forceNewTopic === true;
+  if (forceNewTopic && hcsTopicId) {
+    console.log(`[/v2/join] Force-recreating HCS topic for ${agentId} (clearing dead topic ${hcsTopicId})`);
+    db.getDb().prepare("UPDATE agents SET hcs_topic_id = NULL WHERE id = ?").run(agentId);
+    agentRecord = db.getAgent(agentId);
+    hcsTopicId = null;
+  }
   if (!hcsTopicId) {
     try {
       const topicResult = await createAgentTopic(agentId, agentId);
